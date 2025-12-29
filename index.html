@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Travel Plan</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCtUAp63b3CXg9U4blCjMuGuLq5idQ_kaw&libraries=places"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Compression for shorter links -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+    <!-- Drag and Drop -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+
+    <style>
+        /* Base & Scrollbar */
+        body { font-family: 'Roboto', 'Noto Sans TC', 'Noto Sans JP', sans-serif; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Smooth Theme Transition */
+        .transition-theme { transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease; }
+        
+        /* Dark Mode Input Fix */
+        input, select, textarea { color-scheme: dark; }
+
+        /* Map Dark Mode Override */
+        .dark-map-tiles { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        
+        /* Gemini Gradient Text */
+        .gemini-text {
+            background: linear-gradient(90deg, #4da6ff, #9b8dff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        /* Gmail/Google Style Shadows */
+        .google-shadow { box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); }
+
+        /* --- Aggressive Time/Date Input Centering --- */
+        input[type="time"], input[type="date"] {
+            text-align: center;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+            position: relative;
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* Hide the default calendar/clock icon that pushes text left */
+        input[type="time"]::-webkit-calendar-picker-indicator {
+            display: none;
+            -webkit-appearance: none;
+        }
+
+        /* Date Picker Specific Fix: Overlay native trigger transparently */
+        input[type="date"] {
+            position: relative;
+        }
+        
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            display: block !important;
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            height: 100%;
+            width: 3rem; /* Wide hit area to cover the custom icon */
+            opacity: 0;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        /* Force internal layout to center */
+        input[type="time"]::-webkit-datetime-edit,
+        input[type="date"]::-webkit-datetime-edit {
+            padding: 0;
+            margin: 0;
+            display: inline-flex; /* Changed from contents to inline-flex for better width handling */
+            justify-content: center;
+        }
+        
+        /* iOS Safari Centering */
+        input[type="time"]::-webkit-date-and-time-value,
+        input[type="date"]::-webkit-date-and-time-value {
+            text-align: center;
+            display: inline-block;
+        }
+
+        /* Drag and Drop Styling */
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: rgba(200, 200, 200, 0.2);
+        }
+        .sortable-drag {
+            cursor: grabbing;
+        }
+
+        /* Force Google Autocomplete results to show above everything else */
+        /* Keep only the light styling for Google Autocomplete */
+        .pac-container {
+            background-color: white !important;
+            border: 1px solid #ddd !important;
+            color: #3c4043 !important;
+            z-index: 9999 !important;
+        }
+        .pac-item {
+            border-top: 1px solid #eee !important;
+            color: #555 !important;
+        }
+        .pac-item-query {
+            color: #1a73e8 !important;
+        }
+        /* Add this to your style block to fix iOS Gradient rendering */
+        .transition-theme { 
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease; 
+            -webkit-tap-highlight-color: transparent; /* Fixes grey box on tap */
+        }
+
+        /* Specific fix for iOS Ticket Gradients */
+        [class*='bg-gradient-to'] {
+            background-origin: border-box;
+            -webkit-background-clip: padding-box;
+        }
+
+        /* --- iPhone specific layout fixes --- */
+
+        /* 1. Fix shifted time text on iOS */
+        input[type="time"]::-webkit-date-and-time-value {
+            text-align: center !important;
+            display: block !important;
+            width: 100%;
+        }
+
+        /* 2. Fix gradient disappearing on iOS when using drop-shadow */
+        [class*='bg-gradient-to'] {
+            -webkit-background-clip: padding-box;
+            background-clip: padding-box;
+            transform: translateZ(0); /* Forces GPU rendering */
+        }
+
+        /* 3. Remove default iOS styling from selects */
+        select {
+            -webkit-appearance: none;
+            appearance: none;
+        }
+    </style>
+</head>
+<body class="bg-[#f0f2f5] text-[#3c4043] h-screen flex flex-col overflow-hidden transition-theme">
+    <div id="app"  class="flex flex-col h-full max-w-md mx-auto w-full relative sm:rounded-xl sm:my-4 sm:h-[95vh] border transition-theme overflow-hidden bg-white border-gray-200 google-shadow">
+            <div v-if="isLoading" class="absolute inset-0 z-[10000] flex flex-col items-center justify-center bg-white transition-opacity duration-500">
+                <div class="relative w-24 h-24 mb-4">
+                    <div class="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
+                    <div class="absolute inset-0 border-4 border-t-[#1a73e8] border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <i class="ph-duotone ph-airplane-tilt text-4xl text-[#1a73e8] animate-bounce"></i>
+                    </div>
+                </div>
+                <h2 class="text-lg font-bold text-[#3c4043] tracking-tight">Preparing your trip...</h2>
+                <p class="text-xs text-gray-400 mt-2 font-medium uppercase tracking-widest">Loading data</p>
+            </div>
+            <div v-if="pullDistance > 0" 
+                class="absolute left-0 right-0 z-[100] flex items-center justify-center transition-all overflow-hidden"
+                :style="{ height: pullDistance + 'px', top: '0px' }">
+                <div class="flex items-center gap-2 text-[#1a73e8] bg-white px-4 py-2 rounded-full shadow-lg border border-gray-100 translate-y-2">
+                    <i class="ph-bold ph-arrows-clockwise" :class="{'animate-spin': isRefreshing}"></i>
+                    <span class="text-xs font-bold">{{ isRefreshing ? 'Reloading...' : 'Pull to Refresh' }}</span>
+                </div>
+            </div>
+            <div v-if="!isOnline" class="bg-red-500 text-white text-xs font-bold text-center py-1 z-[9999] transition-all">
+                 {{ locale === 'zh' ? '⚠️ 無網路連線 - 使用離線模式 (資料將在連線後同步)' : '⚠️ No Internet - Offline Mode (Data syncs when online)' }}
+            </div>
+        <header class="shrink-0 z-20 border-b transition-theme px-4 py-3 bg-white text-[#3c4043] border-gray-200">
+            
+            <div class="flex justify-between items-center mb-3">
+                <div class="flex items-center gap-3">
+                    <button @click="showTripMenu = !showTripMenu" class="p-2 -ml-2 rounded-full transition-colors hover:bg-gray-100 text-[#5f6368]">
+                        <i class="ph-bold ph-list text-2xl"></i>
+                    </button>
+                    
+                    <div class="flex-1 min-w-0 mr-2">
+                        <div class="flex items-center gap-2 mb-0.5">
+                            <div v-if="!isEditingTitle" class="flex items-center gap-2 truncate group max-w-[180px] sm:max-w-[250px]">
+                                <h1 :title="setup.destination" class="text-lg font-medium truncate text-[#3c4043] flex-1 min-w-0">
+                                    {{ setup.destination || t.tripPlan }}
+                                </h1>
+                                <button @click="startEditTitle" class="opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity shrink-0">
+                                    <i class="ph-bold ph-pencil-simple text-sm"></i>
+                                </button>
+                            </div>
+                            <input v-else 
+                                   ref="titleInput"
+                                   v-model="setup.destination" 
+                                   @blur="stopEditTitle" 
+                                   @keyup.enter="stopEditTitle"
+                                   maxlength="30"
+                                   class="w-full bg-transparent border-b-2 focus:outline-none text-lg font-medium px-0 py-0text-[#3c4043] border-blue-600"
+                                   :placeholder="t.destPlaceholder">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 items-center">
+                     <button @click="toggleLang" class="w-8 h-8 rounded-full font-bold text-[11px] flex items-center justify-center transition-theme border leading-none pb-[1px] bg-white border-gray-300 hover:bg-gray-50 text-[#3c4043]">
+                         {{ locale === 'zh' ? 'EN' : '中' }}
+                     </button>                     
+                     <button @click="sharePlan" class="h-8 px-3 rounded-full font-bold text-[12px] flex items-center justify-center transition-colors bg-[#1a73e8] hover:bg-[#1557b0] text-white shadow-sm">
+                         {{ t.share }}
+                     </button>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1 flex-1 min-w-0">
+                    <button @click="scrollDay('prev')" class="shrink-0 w-6 h-8 flex items-center justify-center rounded-full transition-colors text-gray-400 hover:bg-gray-100 hover:text-gray-800"
+                            :class="[currentDayIdx === 0 ? 'opacity-30 cursor-not-allowed' : '']"
+                            :disabled="currentDayIdx === 0">
+                        <i class="ph-bold ph-caret-left"></i>
+                    </button>
+
+                    <div ref="daysContainer" class="flex-1 flex overflow-x-auto hide-scroll space-x-1 snap-x px-1 scroll-smooth">
+                        <div v-for="(day, index) in days" :key="index" @click="currentDayIdx = index" 
+                             class="snap-center shrink-0 flex flex-col items-center justify-center w-16 h-14 rounded-lg cursor-pointer transition-all border border-transparent" 
+                             :class="getDayTabClass(index)">
+                            <span class="text-[10px] font-bold leading-none mb-0.5">Day {{ index + 1 }}</span>
+                            <span class="text-[9px] opacity-80 leading-tight text-center tracking-tight">{{ formatTabDate(day.fullDate) }}</span>
+                            <span class="text-[8px] opacity-60 leading-none mt-0.5">{{ formatTabDayOfWeek(day.fullDate) }}</span>
+                        </div>
+                        <button @click="addDay" class="shrink-0 w-8 h-14 rounded-lg border border-dashed flex items-center justify-center transition-colors text-sm border-gray-300 text-gray-400 hover:text-blue-600 hover:border-blue-400">
+                            <i class="ph-bold ph-plus"></i>
+                        </button>
+                    </div>
+
+                    <button @click="scrollDay('next')" class="shrink-0 w-6 h-8 flex items-center justify-center rounded-full transition-colors text-gray-400 hover:bg-gray-100 hover:text-gray-800"
+                            :class="[currentDayIdx >= days.length - 1 ? 'opacity-30 cursor-not-allowed' : '']"
+                            :disabled="currentDayIdx >= days.length - 1">
+                        <i class="ph-bold ph-caret-right"></i>
+                    </button>
+                </div>
+
+                <div class="flex p-1 rounded-full shrink-0 bg-[#f1f3f4]">
+                    <button @click="viewMode = 'plan'" :class="navBtnClass('plan')" class="p-2 rounded-full w-9 h-9 flex items-center justify-center transition-all"><i class="ph-fill ph-calendar-check text-lg"></i></button>
+                    <button @click="viewMode = 'map'" :class="navBtnClass('map')" class="p-2 rounded-full w-9 h-9 flex items-center justify-center transition-all"><i class="ph-fill ph-map-trifold text-lg"></i></button>
+                    <button @click="viewMode = 'money'" :class="navBtnClass('money')" class="p-2 rounded-full w-9 h-9 flex items-center justify-center transition-all"><i class="ph-fill ph-currency-dollar text-lg"></i></button>
+                </div>
+            </div>
+        </header>
+
+        <main             
+            @touchstart="handleTouchStart" 
+            @touchmove="handleTouchMove" 
+            @touchend="handleTouchEnd"
+            class="flex-1 overflow-y-auto relative hide-scroll transition-theme bg-[#f8f9fa]">
+            
+            <div v-if="viewMode === 'plan'" class="p-4 pb-24 animate-fade">
+                <div class="p-4 rounded-xl mb-6 border transition-theme relative group bg-white border-gray-200 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div class="w-full mr-2">
+                             <p class="text-sm font-medium mb-1 text-black">{{ formatDate(currentDay.fullDate) }}</p>
+                             <input v-model="currentDay.title" class="text-xl font-medium w-full bg-transparent focus:outline-none placeholder-opacity-50 text-[#3c4043] placeholder-gray-400" 
+                                    :placeholder="t.dayTheme">
+                        </div>
+                        <button @click="tryDeleteDay" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors" 
+                                :title="locale === 'zh' ? '刪除此日' : 'Delete Day'">
+                            <i class="ph-bold ph-trash text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="relative pl-6 border-l-2 transition-theme min-h-[50px] border-gray-200">
+    
+    <div ref="sortableList" class="space-y-8">
+        <div v-for="(item, idx) in currentDay.items" :key="item.id"
+                class="relative group transition-all duration-300 ease-in-out cursor-move"
+                :data-id="idx">
+                
+            <div class="absolute -left-[31px] top-3 w-4 h-4 rounded-full border-4 transition-colors bg-white" 
+     :class="[getDotColor(item.type), 'border-white']"></div>
+            
+            <div class="p-3 rounded-lg transition-theme relative group z-0" 
+     :class="[
+     isTicketType(item.type) 
+         ? 'overflow-hidden z-0 ' + getTicketClass(item.type) + ' text-white border-transparent drop-shadow-md'
+         : (
+             ('bg-white border border-gray-200 text-[#3c4043] hover:shadow-md') +
+             /* UPDATED: Added check for activeSearchIndex to allow the dropdown to show */
+             (activeIconSelectorIndex === idx || activeSearchIndex === idx ? ' z-50 overflow-visible' : ' overflow-hidden')
+             )
+     ]">
+                
+                <div v-if="isTicketType(item.type)" class="absolute top-1/2 -left-2 w-4 h-4 rounded-full z-10 -translate-y-1/2 bg-white"></div>
+                <div v-if="isTicketType(item.type)" class="absolute top-1/2 -right-2 w-4 h-4 rounded-full z-10 -translate-y-1/2 bg-white"></div>
+
+                <div class="flex gap-3" :class="isTicketType(item.type) ? 'items-center' : 'items-start'">
+                    
+                    <div v-if="!isTicketType(item.type)" class="w-24 shrink-0 flex flex-col gap-1.5 items-center justify-center min-h-[60px]">
+                        <div class="relative w-full">
+                            <input 
+                                v-model="item.time" 
+                                :type="!item.time ? 'text' : 'time'"
+                                @focus="onTimeFocus(item, $event)"
+                                @blur="onTimeBlur(item, $event)"
+                                @click="onTimeClick($event)"
+                                placeholder="--:--"
+                                class="text-xs font-bold w-full rounded py-1 pl-6 pr-1 border transition-theme text-center appearance-none cursor-pointer bg-gray-50 border-gray-200 text-gray-600 placeholder-gray-400"
+                            >
+                            <i class="ph-bold ph-clock absolute left-2 top-1/2 -translate-y-1/2 text-[10px] pointer-events-none z-10 text-gray-400"></i>
+                        </div>
+                        
+                        <select 
+                            :value="item.type" 
+                            @change="updateItemType(item, $event.target.value)"
+                            class="text-[10px] w-full border rounded px-1 py-1 transition-theme text-center appearance-none font-bold bg-white border-gray-200 text-gray-500">
+                            <option value="spot">📍 {{ t.spot }}</option>
+                            <option value="activity">☕ {{ t.activity }}</option>
+                            <option value="food">🍴 {{ t.food }}</option>
+                            <option value="car">🚗 {{ t.car }}</option>
+                            <option value="accommodation">🛏️ {{ t.accommodation }}</option>
+                            <option value="flight">✈️ {{ t.flight }}</option>
+                            <option value="train">🚆 {{ t.train }}</option>
+                            <option value="boat">⛴️ {{ t.boat }}</option>
+                            <option value="bus">🚌 {{ t.bus }}</option>
+                            <option value="reminder">🔔 {{ t.reminder }}</option>
+                        </select>
+                    </div>
+
+                    <div v-if="isTicketType(item.type)" class="flex-1 min-w-0 flex items-start justify-between gap-1 sm:gap-2 p-1">
+                        
+                        <div class="flex flex-col items-center flex-1 min-w-0">
+                            <span class="text-[9px] opacity-70 font-bold tracking-wider mb-1">{{ t.depTime }}</span>
+                           <input :type="!item.time ? 'text' : 'time'" 
+                            v-model="item.time" 
+                            @focus="onTimeFocus(item, $event)"
+                            @blur="onTimeBlur(item, $event)"
+                            @click="onTimeClick($event)"
+                            placeholder="--:--"
+                            class="bg-transparent font-mono font-bold text-xl sm:text-2xl focus:outline-none w-full text-center text-white p-0 leading-none mb-1">
+                            <input v-model="item.origin" 
+                                    class="w-full text-xs font-bold bg-transparent border-none focus:ring-0 text-center uppercase placeholder-white/50 tracking-wider" 
+                                    placeholder="ORG">
+                        </div>
+
+                        <div class="flex flex-col items-center w-20 sm:w-24 gap-2 pt-1 shrink-0">
+                            <div class="relative w-full">
+                                <select :value="item.type" @change="updateItemType(item, $event.target.value)"
+                                    class="appearance-none w-full bg-black/0 hover:bg-black/10 text-transparent text-[10px] font-bold py-1 px-1 rounded-full text-center cursor-pointer border-none focus:ring-0 transition-colors">
+                                    <option class="text-black" value="spot">📍 {{ t.spot }}</option>
+                                    <option class="text-black" value="activity">☕ {{ t.activity }}</option>
+                                    <option class="text-black" value="food">🍴 {{ t.food }}</option>
+                                    <option class="text-black" value="car">🚗 {{ t.car }}</option>
+                                    <option class="text-black" value="accommodation">🛏️ {{ t.accommodation }}</option>
+                                    <option class="text-black" value="flight">✈️ {{ t.flight }}</option>
+                                    <option class="text-black" value="train">🚆 {{ t.train }}</option>
+                                    <option class="text-black" value="boat">⛴️ {{ t.boat }}</option>
+                                    <option class="text-black" value="reminder">🔔 {{ t.reminder }}</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                    <i class="ph-fill text-white text-lg" :class="getTicketIcon(item.type)"></i>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center w-full opacity-60">
+                                <div class="h-px flex-1 bg-white border-t border-dashed border-white/70"></div>
+                                <div class="h-px w-1"></div>
+                                <div class="h-px flex-1 bg-white border-t border-dashed border-white/70"></div>
+                            </div>
+                            
+                            <input v-model="item.activity" class="w-full text-[10px] bg-transparent border-none focus:ring-0 text-center placeholder-white/70 uppercase tracking-widest font-medium" 
+                                    :placeholder="getTicketPlaceholder(item.type)">
+                        </div>
+
+                        <div class="flex flex-col items-center flex-1 min-w-0">
+                            <span class="text-[9px] opacity-70 font-bold tracking-wider mb-1">{{ t.arrTime }}</span>
+                            <input :type="!item.arrTime ? 'text' : 'time'" 
+                                v-model="item.arrTime" 
+                                @focus="onTimeFocus(item, $event)"
+                                @blur="onTimeBlur(item, $event)"
+                                @click="onTimeClick($event)"
+                                placeholder="--:--"
+                                class="bg-transparent font-mono font-bold text-xl sm:text-2xl focus:outline-none w-full text-center text-white p-0 leading-none mb-1">
+                            <input v-model="item.location" 
+                                    class="w-full text-xs font-bold bg-transparent border-none focus:ring-0 text-center uppercase placeholder-white/50 tracking-wider" 
+                                    placeholder="DST">
+                            
+                            <button @click="toggleDayOffset(item)" 
+                                    class="mt-1 text-[8px] font-bold px-1.5 py-px rounded-full border transition-all whitespace-nowrap"
+                                    :class="[
+                                        getDayOffsetClass(item.arrOffset),
+                                        item.arrOffset === 0 ? 'border-transparent bg-white/20 text-white/80 hover:bg-white/30' : ''
+                                    ]">
+                                {{ getDayOffsetLabel(item.arrOffset) }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-else class="flex-1 min-w-0 self-center">
+                        <div class="flex items-center gap-2 mb-1">
+                                
+                            <button v-if="item.type === 'activity'"
+                                    @click="toggleIconSelector(idx)"
+                                    class="shrink-0 transition-colors relative text-lg text-blue-600 hover:text-blue-800"
+                                    title="Select Icon">
+                                <i class="ph-fill" :class="item.icon || 'ph-coffee'"></i>
+                                
+                                <div v-if="activeIconSelectorIndex === idx" 
+                                        class="absolute top-full left-0 mt-1 z-50 p-2 rounded shadow-xl grid grid-cols-4 gap-2 w-32 bg-white border border-gray-200">
+                                    <i v-for="icon in activityIcons" :key="icon" 
+                                        class="ph-fill text-lg cursor-pointer hover:scale-110 transition-transform"
+                                        :class="[icon, 'text-gray-600 hover:text-blue-600']"
+                                        @mousedown.prevent="selectActivityIcon(item, icon)"></i>
+                                </div>
+                            </button>
+                            
+                            <input v-model="item.activity" class="block w-full font-medium text-sm bg-transparent focus:outline-none placeholder-gray-400" :placeholder="t.activityName">
+                        </div>
+                        
+                        <div class="relative flex items-center gap-1 mt-1.5">
+                            <button v-if="item.location" 
+                                    @click="openMap(item.location)"
+                                    class="shrink-0 transition-colors text-blue-600 hover:text-blue-800"
+                                    :title="locale === 'zh' ? '在 Google 地圖中開啟' : 'Open in Google Maps'">
+                                <i class="ph-fill ph-map-pin text-[10px]"></i>
+                            </button>
+                            <i v-else class="ph-fill ph-map-pin text-[10px] text-gray-400"></i>
+                            
+                            <div class="flex-1 relative">
+                                <input 
+    v-model="item.location" 
+    :id="'location-input-' + idx"
+    @focus="initGoogleAutocomplete(idx)"
+    class="block w-full text-xs bg-transparent focus:outline-none truncate location-search-input text-gray-500 placeholder-gray-300" 
+    :placeholder="t.location"
+>
+                                
+                                
+                            </div>
+                        </div>
+                        
+                        <div v-if="item.weather && !isTicketType(item.type) && item.type !== 'car'" 
+                                class="flex items-center gap-2 mt-1.5 text-[10px] transition-colors text-gray-500">
+                            <div class="flex items-center gap-1">
+                                <span>{{ getWeatherIcon(item.weather.code) }}</span>
+                                <span>{{ Math.round(item.weather.max) }}° / {{ Math.round(item.weather.min) }}°</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-1 mt-1">
+                            <i class="ph-fill ph-note-pencil text-[10px] mt-0.5 text-orange-400"></i>
+                            <textarea 
+                                v-model="item.note" 
+                                :ref="(el) => adjustHeight(el)"
+                                @input="adjustHeight($event.target)"
+                                rows="1" 
+                                class="block w-full text-xs italic bg-transparent focus:outline-none resize-none leading-normal overflow-hidden text-orange-600 placeholder-gray-300" 
+                                :placeholder="t.note"
+                            ></textarea>
+                        </div>
+                    </div>
+                    
+                    <button @click="removeItem(idx)" class="absolute top-1 right-1 p-1 transition-colors z-20"
+                            :class="isTicketType(item.type) ? 'text-white/30 hover:text-white' : 'text-gray-300 hover:text-red-500'">
+                            <i class="ph-bold ph-x text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <button @click="addItem" class="mt-8 flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-full hover:bg-opacity-10 transition-colors text-[#1a73e8] hover:bg-blue-50">
+        <i class="ph-bold ph-plus-circle"></i> {{ t.addItem }}
+    </button>
+</div>
+                
+            </div>
+
+            <div v-if="viewMode === 'money'" class="p-4 pb-24 animate-fade">
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500">{{ t.travelers }}</h3>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <div v-for="(person, idx) in travelers" :key="idx" 
+                             class="group flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors relative bg-blue-50 border-blue-100 text-blue-600">
+                            
+                            <div v-if="editingTravelerIdx === idx" class="flex items-center">
+                                <input v-model="editingTravelerName" 
+                                       @keyup.enter="saveMemberName(idx)"
+                                       @blur="saveMemberName(idx)"
+                                       ref="editMemberInput"
+                                       class="w-16 bg-transparent outline-none border-b border-blue-500 text-center p-0 text-black">
+                            </div>
+                            <span v-else @click="startEditingMember(idx)" class="cursor-pointer select-none hover:underline" title="Click to edit">{{ person }}</span>
+                            
+                            <button v-if="travelers.length > 1 && editingTravelerIdx !== idx" @click="removeTraveler(idx)" class="ml-1 hover:text-red-500"><i class="ph-bold ph-x"></i></button>
+                        </div>
+                        <div class="flex items-center">
+                            <input v-model="newTravelerName" @keyup.enter="addTraveler" :placeholder="t.name" 
+                                   class="w-20 px-2 py-1.5 rounded-l-full text-xs border-y border-l transition-theme outline-none bg-white border-gray-200 placeholder-gray-400">
+                            <button @click="addTraveler" class="px-2 py-1.5 rounded-r-full text-xs border border-l-0 transition-colors bg-white border-gray-200 text-blue-600 hover:bg-gray-50">
+                                <i class="ph-bold ph-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-xl p-4 shadow-sm border mb-6 transition-theme bg-white border-gray-200">
+                     <div class="flex items-center justify-between w-full text-xs font-bold uppercase tracking-wider mb-2">
+                        <button @click="showSettlement = !showSettlement" class="flex items-center gap-1 text-gray-500">
+                            <i class="ph-bold ph-scales"></i> {{ t.settlement }}
+                            <i class="ph-bold" :class="showSettlement ? 'ph-caret-up' : 'ph-caret-down'"></i>
+                        </button>
+                        
+                        <div v-if="showSettlement" class="flex gap-2">
+                            <button @click="settlementMode = settlementMode === 'consolidated' ? 'currency' : 'consolidated'"
+                                    class="text-[9px] px-2 py-1 rounded border transition-colors border-gray-200 hover:bg-gray-50">
+                                {{ settlementMode === 'consolidated' ? t.byCurrency : t.consolidated }}
+                            </button>
+                        </div>
+                     </div>
+                     
+                     <div v-if="showSettlement" class="space-y-4 mt-4 animate-fade">
+                        <div v-if="settlementMode === 'consolidated'" class="text-xs space-y-2 pb-4 border-b border-dashed border-opacity-20 border-black">
+                            <div v-for="person in settlementPlan.breakdown" :key="person.name" class="flex justify-between items-center">
+                                <span>{{ person.name }}</span>
+                                <div class="text-right">
+                                    <span class="block font-mono text-gray-700">{{ t.paid }}: RM{{ Math.round(person.paid).toLocaleString() }}</span>
+                                    <span class="block text-[10px]" :class="person.balance >= 0 ? 'text-green-500' : 'text-red-500'">
+                                        {{ person.balance >= 0 ? t.getBack : t.owes }} RM{{ Math.round(Math.abs(person.balance)).toLocaleString() }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                             <h4 class="text-[10px] font-bold opacity-60 mb-2 uppercase">{{ t.transactions }} ({{ settlementMode === 'consolidated' ? t.consolidated : t.byCurrency }})</h4>
+                             
+                             <div v-if="settlementMode === 'consolidated'">
+                                 <div v-if="settlementPlan.transactions.length === 0" class="text-xs opacity-50 italic">{{ t.allSettled }}</div>
+                                 <div v-else class="space-y-2">
+                                    <div v-for="(tx, i) in settlementPlan.transactions" :key="i" 
+                                         class="flex items-center justify-between text-xs p-2 rounded border bg-gray-50 border-gray-100">
+                                        <div class="flex items-center gap-1">
+                                            <span class="font-bold text-red-400">{{ tx.from }}</span>
+                                            <span class="text-[10px] opacity-60 px-1">{{ t.owesLowerCase }}</span>
+                                            <span class="font-bold text-green-500">{{ tx.to }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-mono font-bold">RM{{ Math.round(tx.amount).toLocaleString() }}</span>
+                                            <button @click="quickSettle(tx.from, tx.to, tx.amount, 'MYR')" 
+                                                    class="text-[9px] px-2 py-0.5 rounded border transition-colors flex items-center gap-1 border-green-200 text-green-700 hover:bg-green-50">
+                                                {{ t.settle }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                 </div>
+                             </div>
+
+                             <div v-else>
+                                 <div v-if="transactionsGroupedByPerson.length === 0" class="text-xs opacity-50 italic">{{ t.noPending }}</div>
+                                 <div v-for="(group, i) in transactionsGroupedByPerson" :key="i" class="mb-3 border rounded-lg p-2 border-gray-200 bg-gray-50">
+                                     <div class="flex items-center gap-1 text-xs font-bold mb-2 pb-1 border-b border-dashed border-opacity-20 border-black">
+                                         <span class="text-red-400">{{ group.from }}</span>
+                                         <span class="opacity-50 font-normal">{{ t.owesLowerCase }}</span>
+                                         <span class="text-green-500">{{ group.to }}</span>
+                                     </div>
+                                     
+                                     <div class="space-y-1.5">
+                                         <div v-for="(debt, dIdx) in group.debts" :key="dIdx" class="flex items-center justify-between">
+                                             <span class="text-xs font-mono font-bold">{{ Math.round(debt.amount).toLocaleString() }} {{ debt.currency }}</span>
+                                             <button @click="quickSettle(group.from, group.to, debt.amount, debt.currency)" 
+                                                     class="text-[9px] px-2 py-0.5 rounded border transition-colors flex items-center gap-1 border-green-200 text-green-700 hover:bg-green-50">
+                                                 <i class="ph-bold ph-check"></i> {{ t.settle }}
+                                             </button>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+
+                        </div>
+                     </div>
+                </div>
+
+                <div class="rounded-xl p-4 shadow-sm border mb-6 transition-theme bg-white border-gray-200">
+                    <h3 class="text-xs font-bold mb-3 uppercase tracking-wider text-gray-500">{{ t.addExpense }}</h3>
+                    
+                    <div class="flex gap-2 mb-2">
+                        <input v-model="newExpense.item" :placeholder="t.item" class="flex-[2] p-2.5 rounded-lg text-sm transition-theme border bg-[#f1f3f4] border-transparent focus:bg-white focus:border-blue-500">
+                        <div class="relative flex-1">
+                            <select v-model="newExpense.currency" class="w-full p-2.5 rounded-lg text-sm transition-theme border appearance-none bg-[#f1f3f4] border-transparent focus:bg-white focus:border-blue-500">
+                                <option value="MYR">MYR</option>
+                                <option value="SGD">SGD</option>
+                                <option value="JPY">JPY</option>
+                                <option value="TWD">TWD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="IDR">IDR</option>
+                                <option value="THB">THB</option>
+                                <option value="PHP">PHP</option>
+                                <option value="USD">USD</option>
+                                <option value="KRW">KRW</option>
+                                <option value="CNY">CNY</option>
+                            </select>
+                            <span v-if="isLoadingRate" class="absolute right-2 top-1/2 -translate-y-1/2">
+                                <i class="ph-bold ph-spinner animate-spin text-xs"></i>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2 mb-2">
+                        <div class="relative flex-[2]">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-50">$</span>
+                            <input v-model.number="newExpense.amount" type="number" placeholder="0" class="w-full pl-6 p-2.5 rounded-lg text-sm font-mono transition-theme border bg-[#f1f3f4] border-transparent focus:bg-white focus:border-blue-500">
+                        </div>
+                        <div class="relative flex-1">
+                             <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] opacity-50">x</span>
+                            <input v-model.number="newExpense.rate" type="number" step="0.0001" :placeholder="t.manualRate" class="w-full pl-5 p-2.5 rounded-lg text-sm font-mono transition-theme border bg-[#f1f3f4] border-transparent focus:bg-white focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 mb-3">
+                        <div class="flex-1 relative">
+                            <input type="date" v-model="newExpense.date" ref="dateInputRef" @click="safeShowPicker($event)"
+                                   class="w-full p-2.5 rounded-lg text-xs font-bold transition-theme border text-center appearance-none cursor-pointer bg-[#f1f3f4] border-transparent focus:bg-white focus:border-blue-500">
+                            <button class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors pointer-events-none"
+                                    :class="isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-blue-600'">
+                                <i class="ph-bold ph-calendar-blank"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="flex-1 relative">
+                            <select v-model="newExpense.paidBy" class="w-full h-full p-2.5 rounded-lg text-xs font-bold transition-theme border appearance-none"
+                                    :class="isDark ? 'bg-[#1e1e1e] border-gray-700 text-white' : 'bg-[#f1f3f4] border-transparent focus:bg-white focus:border-blue-500'">
+                                <option v-for="p in travelers" :key="p" :value="p">{{ p }} {{ t.paidSuffix }}</option>
+                            </select>
+                            <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"></i>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 pt-2 border-t border-dashed" :class="isDark ? 'border-gray-800' : 'border-gray-200'">
+                        <div class="flex justify-between items-center mb-2">
+                             <label class="text-[10px] font-bold opacity-60 uppercase">{{ t.splitOptions }}</label>
+                             <div class="flex rounded-lg overflow-hidden border" :class="isDark ? 'border-gray-700' : 'border-gray-200'">
+                                 <button v-for="method in ['equal', 'amount', 'ratio']" :key="method"
+                                         @click="newExpense.splitMethod = method"
+                                         class="px-2 py-1 text-[10px] font-bold uppercase transition-colors"
+                                         :class="newExpense.splitMethod === method 
+                                            ? (isDark ? 'bg-[#a8c7fa] text-black' : 'bg-blue-100 text-blue-700') 
+                                            : (isDark ? 'bg-[#1e1e1e] hover:bg-white/10' : 'bg-white hover:bg-gray-50')">
+                                     {{ method === 'equal' ? t.equal : (method === 'amount' ? t.amount : t.ratio) }}
+                                 </button>
+                             </div>
+                        </div>
+
+                        <div v-if="newExpense.splitMethod === 'equal'" class="flex flex-wrap gap-2">
+                            <button v-for="p in travelers" :key="p" 
+                                    @click="toggleInvolved(p)"
+                                    class="text-xs px-2 py-1 rounded-full border transition-all"
+                                    :class="newExpense.involved.includes(p) 
+                                        ? (isDark ? 'bg-[#a8c7fa]/20 border-[#a8c7fa] text-[#a8c7fa]' : 'bg-blue-50 border-blue-200 text-blue-700') 
+                                        : (isDark ? 'border-gray-700 opacity-50' : 'border-gray-200 opacity-50')">
+                                {{ p }}
+                            </button>
+                        </div>
+
+                        <div v-else class="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                            <div v-for="p in travelers" :key="p" class="flex items-center gap-2">
+                                <div class="w-16 truncate text-xs font-bold opacity-70">{{ p }}</div>
+                                <div class="flex-1 relative">
+                                    <input type="number" v-model.number="newExpense.splitDetails[p]" 
+                                           class="w-full p-1.5 pl-2 text-xs rounded border transition-theme text-right"
+                                           :placeholder="newExpense.splitMethod === 'ratio' ? '1' : '0'"
+                                           :class="isDark ? 'bg-[#1e1e1e] border-gray-700 text-white' : 'bg-[#f1f3f4] border-transparent'">
+                                    <span v-if="newExpense.splitMethod === 'ratio'" class="absolute right-7 top-1/2 -translate-y-1/2 text-[9px] opacity-40">{{ t.shareUnit }}</span>
+                                </div>
+                                <div class="w-24 text-right text-[10px] font-mono opacity-60">
+                                    <div v-if="newExpense.amount">
+                                        {{ calculateSplitAmount(p).toFixed(0) }} {{ newExpense.currency }}
+                                    </div>
+                                    <div v-if="newExpense.amount">
+                                        RM{{ (calculateSplitAmount(p) * newExpense.rate).toFixed(1) }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="newExpense.splitMethod === 'amount' && Math.abs(currentSplitSum - newExpense.amount) > 1" 
+                                 class="text-[10px] text-red-500 text-right font-bold mt-1">
+                                 Total mismatch: {{ currentSplitSum }} / {{ newExpense.amount }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button @click="addExpense" class="w-full py-2.5 rounded-full font-bold transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2" 
+                            :class="isDark ? 'bg-[#a8c7fa] text-black hover:bg-[#8ab4f8]' : 'bg-[#1a73e8] text-white hover:bg-[#1557b0]'"
+                            :disabled="newExpense.splitMethod === 'amount' && Math.abs(currentSplitSum - newExpense.amount) > 1">
+                        <i class="ph-bold ph-plus"></i> {{ t.add }}
+                    </button>
+                </div>
+
+                <div class="space-y-2">
+                    <div v-for="(exp, idx) in expenses" :key="idx" 
+                         class="flex justify-between items-center p-3 rounded-lg border transition-theme relative overflow-hidden group" 
+                         :class="[
+                            isDark ? 'bg-[#131314] border-gray-800 text-white' : 'bg-white border-gray-200 text-[#3c4043]',
+                            exp.isSettled ? 'opacity-50 grayscale' : ''
+                         ]">
+                        <div class="flex items-center gap-3">
+                            <button @click="toggleExpenseSettled(exp)" 
+                                    class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors border"
+                                    :class="[
+                                        exp.isSettled 
+                                            ? 'bg-green-500 border-green-500 text-white' 
+                                            : (isDark ? 'bg-gray-800 border-gray-700 text-gray-500 hover:text-green-400 hover:border-green-400' : 'bg-blue-50 border-blue-100 text-blue-600 hover:text-green-500 hover:border-green-300')
+                                    ]"
+                                    :title="exp.isSettled ? 'Mark as Unsettled' : 'Mark as Settled'">
+                                <i class="ph-bold" :class="exp.isSettled ? 'ph-check' : 'ph-currency-dollar'"></i>
+                            </button>
+
+                            <div class="min-w-0" :class="exp.isSettled ? 'line-through decoration-gray-500' : ''">
+                                <div class="font-bold text-sm leading-tight truncate pr-2">{{ exp.item }}</div>
+                                <div class="text-[10px] font-mono opacity-60">
+                                    {{ exp.date }} • {{ t.paidBy }} <span class="font-bold">{{ exp.paidBy }}</span>
+                                </div>
+                                <div class="text-[10px] font-mono opacity-50 flex items-center flex-wrap gap-1">
+                                    <span>{{ exp.amount }} {{ exp.currency }}</span>
+                                    
+                                    <span v-if="exp.type === 'settlement'" class="px-1 rounded bg-green-500/20 text-green-600 font-bold border border-green-500/30">
+                                        {{ t.settlement }}
+                                    </span>
+
+                                    <span v-if="exp.splitMethod === 'equal' && exp.involved.length < travelers.length" class="px-1 rounded bg-gray-500/20">
+                                        {{ t.split }}: {{ exp.involved.length }} {{ t.ppl }}
+                                    </span>
+                                    <span v-if="exp.splitMethod !== 'equal' && exp.type !== 'settlement'" class="px-1 rounded bg-gray-500/20">
+                                        {{ exp.splitMethod === 'amount' ? t.amount : t.ratio }}
+                                    </span>
+                                    
+                                    <span v-if="exp.isSettled" class="text-green-500 font-bold uppercase text-[9px] border border-green-500 px-1 rounded">{{ t.settled }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                            <span class="font-mono font-medium text-sm" :class="isDark ? 'text-[#a8c7fa]' : 'text-[#1a73e8]'">
+                                <span class="text-[10px] opacity-60 mr-0.5">RM</span>{{ Math.round(exp.amount * exp.rate).toLocaleString() }}
+                            </span>
+                            <button @click="expenses.splice(idx, 1)" class="text-gray-400 hover:text-red-500 transition-colors"><i class="ph-fill ph-x-circle"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-show="viewMode === 'map'" class="h-full relative">
+                <div id="map" class="w-full h-full bg-[#f8f9fa]"></div>
+            </div>
+
+        </main>
+
+        <div v-if="showTripMenu" class="absolute inset-0 z-[2000] flex animate-fade">
+            <div @click="showTripMenu = false" class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+            
+            <div class="relative w-72 h-full shadow-2xl flex flex-col transition-theme"
+                 :class="isDark ? 'bg-[#1a1a1a] text-white border-r border-gray-800' : 'bg-white text-slate-800'">
+                
+                <div class="p-6 pb-2">
+                    <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white" :class="isDark ? 'bg-[#4c8df6]' : 'bg-[#1a73e8]'">
+                            <i class="ph-bold ph-airplane-tilt"></i>
+                        </div>
+                        Trips
+                    </h2>
+                    
+                    <button @click="createNewTrip" class="w-full py-3 rounded-full font-bold flex items-center justify-center gap-2 mb-4 transition-colors shadow-sm"
+                            :class="isDark ? 'bg-[#2d2e30] hover:bg-[#3c4043] text-[#a8c7fa]' : 'bg-white border border-gray-200 hover:bg-gray-50 text-[#1a73e8] google-shadow'">
+                        <i class="ph-bold ph-plus"></i> {{ t.newTrip }}
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-1">
+                    <div v-for="plan in tripList" :key="plan.id" 
+                         class="group flex items-center justify-between p-3 rounded-r-full rounded-l-md cursor-pointer transition-colors border-l-4"
+                         :class="[
+                            currentTripId === plan.id 
+                                ? (isDark ? 'bg-[#4c8df6]/20 border-[#4c8df6]' : 'bg-blue-50 border-[#1a73e8] text-[#1a73e8]') 
+                                : (isDark ? 'border-transparent hover:bg-white/5' : 'border-transparent hover:bg-gray-100 text-[#3c4043]')
+                         ]"
+                         @click="switchTrip(plan.id)">
+                        
+                        <div class="flex-1 min-w-0">
+                            <div class="font-medium truncate text-sm">{{ plan.setup.destination || 'Untitled Trip' }}</div>
+                            <div class="text-xs opacity-60">
+                                {{ plan.setup.days }} Days • {{ plan.days && plan.days[0] ? formatDate(plan.days[0].fullDate) : '' }}
+                            </div>
+                        </div>
+
+                        <button @click.stop="tryDeleteTrip(plan.id)" class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 rounded-full transition-all">
+                            <i class="ph-bold ph-trash"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-4 border-t" :class="isDark ? 'border-gray-800' : 'border-gray-100'">
+                    <button @click="sharePlan" class="w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors text-sm font-medium"
+                            :class="isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100 text-[#5f6368]'">
+                        <i class="ph-bold ph-share-network text-lg"></i> {{ t.share }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div v-if="showSetupModal" class="absolute inset-0 backdrop-blur z-[2000] flex items-center justify-center p-6 transition-theme animate-fade" :class="isDark ? 'bg-black/90' : 'bg-white/80'">
+            <div class="w-full rounded-2xl p-6 shadow-2xl border transition-theme relative" :class="isDark ? 'bg-[#131314] border-gray-800 text-white' : 'bg-white border-gray-200 text-[#3c4043]'">
+                <div class="absolute -top-12 left-0 right-0 flex justify-center">
+                    <div class="w-20 h-20 rounded-full flex items-center justify-center shadow-lg border-4" 
+                         :class="isDark ? 'bg-[#131314] border-black text-[#a8c7fa]' : 'bg-white border-white text-[#1a73e8]'">
+                        <i class="ph-duotone ph-airplane-tilt text-4xl"></i>
+                    </div>
+                </div>
+                <h2 class="text-2xl font-bold mb-1 mt-6 text-center">{{ t.newTrip }}</h2>
+                <p class="text-xs text-center mb-6 opacity-60">{{ t.startPlanning }}</p>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[10px] font-bold opacity-60 ml-1 uppercase mb-1 block">{{ t.destPlaceholder }}</label>
+                        <input v-model="setup.destination" class="w-full border p-3 rounded-lg transition-theme font-medium text-lg" 
+                               :class="isDark ? 'bg-[#1e1e1e] border-gray-700 text-white placeholder-gray-600' : 'bg-[#f1f3f4] border-transparent focus:bg-white focus:border-blue-500'" placeholder="Tokyo 7-day trip">
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <div class="flex-1">
+                             <label class="text-[10px] font-bold opacity-60 ml-1 uppercase mb-1 block">{{ t.date }}</label>
+                             <div class="relative">
+                                <input type="date" v-model="setup.startDate" ref="setupDateRef" @click="safeShowPicker($event)" class="w-full border p-3 rounded-lg transition-theme cursor-pointer" 
+                                       :class="isDark ? 'bg-[#1e1e1e] border-gray-700 text-white' : 'bg-[#f1f3f4] border-transparent focus:bg-white focus:border-blue-500'">
+                                <button class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors pointer-events-none"
+                                        :class="isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-blue-600'">
+                                    <i class="ph-bold ph-calendar-blank"></i>
+                                </button>
+                             </div>
+                        </div>
+                        <div class="w-24">
+                             <label class="text-[10px] font-bold opacity-60 ml-1 uppercase mb-1 block">{{ t.days }}</label>
+                            <input type="number" v-model="setup.days" class="w-full border p-3 rounded-lg text-center font-bold transition-theme" 
+                                   :class="isDark ? 'bg-[#1e1e1e] border-gray-700 text-white' : 'bg-[#f1f3f4] border-transparent focus:bg-white focus:border-blue-500'">
+                        </div>
+                    </div>
+                    
+                    <button @click="initTrip" class="w-full py-4 rounded-full font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 mt-2" 
+                            :class="isDark ? 'bg-[#4c8df6] text-black hover:bg-[#a8c7fa]' : 'bg-[#1a73e8] text-white hover:bg-[#1557b0]'">
+                        {{ t.startPlanning }} <i class="ph-bold ph-arrow-right"></i>
+                    </button>
+                    
+                    <button v-if="days.length > 0 && tripList.length > 0" @click="showSetupModal = false" class="w-full text-xs py-2 opacity-50 hover:opacity-100">{{ t.cancel }}</button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showShareModal" class="absolute inset-0 backdrop-blur z-[2010] flex items-center justify-center p-6 transition-theme animate-fade" :class="isDark ? 'bg-black/90' : 'bg-white/80'">
+            <div class="w-full rounded-2xl p-6 shadow-2xl border transition-theme relative max-w-sm" :class="isDark ? 'bg-[#131314] border-gray-800 text-white' : 'bg-white border-gray-200 text-[#3c4043]'">
+                <button @click="showShareModal = false" class="absolute right-4 top-4 opacity-50 hover:opacity-100"><i class="ph-bold ph-x text-xl"></i></button>
+                
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="ph-duotone ph-share-network"></i> {{ t.share }}</h2>
+                <p class="text-xs opacity-60 mb-4">{{ locale === 'zh' ? '複製下方連結傳送給旅伴' : 'Copy the link below to share with friends' }}</p>
+                
+                <div class="flex gap-2 mb-4">
+                    <input type="text" :value="shareUrl" readonly class="flex-1 text-xs border rounded-lg p-3 font-mono truncate"
+                           :class="isDark ? 'bg-[#1e1e1e] border-gray-700 text-gray-400' : 'bg-[#f1f3f4] border-transparent text-gray-600'">
+                </div>
+                
+                <button @click="copyLink" class="w-full py-3 rounded-full font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2" 
+                        :class="isCopied ? 'bg-green-600 text-white' : (isDark ? 'bg-[#4c8df6] text-black hover:bg-[#a8c7fa]' : 'bg-[#1a73e8] text-white hover:bg-[#1557b0]')">
+                    <i class="ph-bold" :class="isCopied ? 'ph-check' : 'ph-copy'"></i> {{ isCopied ? (locale === 'zh' ? '已複製' : 'Copied!') : (locale === 'zh' ? '複製連結' : 'Copy Link') }}
+                </button>
+            </div>
+        </div>
+
+        <div v-if="confirmModal.show" class="absolute inset-0 z-[2020] flex items-center justify-center p-6 animate-fade">
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="confirmModal.show = false"></div>
+            <div class="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl border transition-theme"
+                 :class="isDark ? 'bg-[#131314] border-gray-800 text-white' : 'bg-white border-gray-200 text-[#3c4043]'">
+                <h3 class="text-lg font-bold mb-2">{{ confirmModal.title }}</h3>
+                <p class="text-sm opacity-70 mb-6">{{ confirmModal.message }}</p>
+                <div class="flex gap-3 justify-end">
+                    <button @click="confirmModal.show = false" class="px-4 py-2 rounded-lg text-sm font-bold transition-colors"
+                            :class="isDark ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-600'">
+                        Cancel
+                    </button>
+                    <button @click="confirmModal.onConfirm" class="px-4 py-2 rounded-lg text-sm font-bold text-white shadow-md transition-all active:scale-95"
+                            :class="confirmModal.isDestructive ? 'bg-red-500 hover:bg-red-600' : (isDark ? 'bg-[#4c8df6] hover:bg-[#a8c7fa] text-black' : 'bg-[#1a73e8] hover:bg-[#1557b0]')">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        </div>
+
+    <script type="module">
+    import { createApp, ref, computed, watch, onMounted, nextTick } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, enableIndexedDbPersistence, disableNetwork, enableNetwork, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
+    // --- 1. Firebase Configuration ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyB3aA9KmL0yx-g18kp4eFAJv1aOBnnzXC0",
+        authDomain: "travelplan-4e480.firebaseapp.com",
+        projectId: "travelplan-4e480",
+        storageBucket: "travelplan-4e480.firebasestorage.app",
+        messagingSenderId: "844733651450",
+        appId: "1:844733651450:web:239553f327d3196a41ac43"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Enable Offline Persistence
+    enableIndexedDbPersistence(db).catch((err) => {
+        if (err.code == 'failed-precondition') {
+            console.warn('Persistence failed: Multiple tabs open');
+        } else if (err.code == 'unimplemented') {
+            console.warn('Persistence not supported by browser');
+        }
+    });
+
+    const i18n = {
+        zh: {
+            tripPlan: "旅遊計畫", dayTheme: "行程計畫", spot: "景點", activity: "活動", food: "美食", car: "車輛", reminder: "提醒",
+            accommodation: "住宿", flight: "航班", train: "火車", boat: "船",
+            origin: "出發地", destination_flight: "目的地",
+            depTime: "起飛", arrTime: "抵達",
+            flightNo: "班次", ticketNo: "班次", trainNo: "車次", boatCompany: "船公司",
+            addItem: "新增行程", totalSpending: "總支出估算", addExpense: "新增花費", item: "項目",
+            manualRate: "匯率", add: "加入", newTrip: "新旅程", startPlanning: "開始規劃",
+            destPlaceholder: "計畫名稱", share: "分享", activityName: "行程名稱", location: "地點", note: "備註",
+            travelers: "旅伴", settlement: "結算", splitOptions: "分帳選項", transactions: "交易", paidBy: "由...支付",
+            split: "分攤", settled: "已結清", settle: "結算", consolidated: "綜合", byCurrency: "依貨幣",
+            paid: "已付", getBack: "收回", owes: "欠款", allSettled: "全部結清！", noPending: "無待處理交易。",
+            full: "全額", cancel: "取消", confirmPayment: "確認付款", date: "日期", days: "天數",
+            paidSuffix: "支付", equal: "平分", amount: "金額", ratio: "比例", shareUnit: "份",
+            owesLowerCase: "欠", name: "姓名", ppl: "人",
+            generatingLink: "正在產生短連結...", copyLink: "複製連結",
+            bus: "巴士", busNo: "車號"
+        },
+        en: {
+            tripPlan: "Travel Plan", dayTheme: "Title", spot: "Attraction", activity: "Activity", food: "Food", car: "Car", reminder: "Reminder",
+            accommodation: "Hotel", flight: "Flight", train: "Train", boat: "Boat",
+            origin: "Origin", destination_flight: "Dest",
+            depTime: "Dep", arrTime: "Arr",
+            flightNo: "Flight No.", ticketNo: "Ticket No.", trainNo: "Train No.", boatCompany: "Boat Company",
+            addItem: "Add Item", totalSpending: "Total Spending", addExpense: "Add Expense", item: "Item",
+            manualRate: "Rate", add: "Add", newTrip: "New Trip", startPlanning: "Start Planning",
+            destPlaceholder: "Plan Name", share: "Share", activityName: "Activity", location: "Location", note: "Note",
+            travelers: "Travelers", settlement: "Settlement", splitOptions: "Split Options", transactions: "Transactions", paidBy: "Paid by",
+            split: "Split", settled: "Settled", settle: "Settle", consolidated: "Consolidated", byCurrency: "By Currency",
+            paid: "Paid", getBack: "Get back", owes: "Owes", allSettled: "All settled up!", noPending: "No transactions pending.",
+            full: "Full", cancel: "Cancel", confirmPayment: "Confirm Payment", date: "Date", days: "Days",
+            paidSuffix: "Paid", equal: "EQUAL", amount: "AMOUNT", ratio: "RATIO", shareUnit: "share",
+            owesLowerCase: "owes", name: "Name", ppl: "ppl",
+            generatingLink: "Generating Short Link...", copyLink: "Copy Link",
+            bus: "Bus", busNo: "Bus No."
+        }
+    };
+    
+    // Activity Icons Set
+    const activityIcons = [
+        'ph-person-simple-run', 'ph-person-simple-hike', 'ph-goggles', 
+        'ph-shopping-bag', 'ph-bathtub', 'ph-plant', 'ph-parachute',
+        'ph-waves', 'ph-snowflake', 'ph-barbell', 'ph-music-notes',
+        'ph-coffee', 'ph-camera', 'ph-tent', 'ph-bed'
+    ];
+
+    const debounce = (fn, delay) => {
+        let timeoutId;
+        return (...args) => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => fn(...args), delay);
+        };
+    };
+
+    createApp({
+        setup() {
+            // State
+            const locale = ref(localStorage.getItem('lang') || 'en');
+            const viewMode = ref('plan');
+            const currentDayIdx = ref(0);
+            const showSetupModal = ref(false);
+            const showTripMenu = ref(false);
+            const daysContainer = ref(null);
+            const sortableList = ref(null);
+            const isLoading = ref(true); // Default to true so it shows on initial load        
+            
+            // Network State
+            const isOnline = ref(navigator.onLine);
+            
+            // Multi-Trip State
+            const tripList = ref([]);
+            const currentTripId = ref(null);
+            
+            // Travelers State
+            const travelers = ref(['Me']);
+            const newTravelerName = ref('');
+            const showSettlement = ref(false);
+            const settlementMode = ref('consolidated');
+            const isLoadingRate = ref(false);
+            
+            // Edit Traveler Name State
+            const editingTravelerIdx = ref(null);
+            const editingTravelerName = ref('');
+            const editMemberInput = ref(null);
+            
+            // Refs
+            const dateInputRef = ref(null);
+            const setupDateRef = ref(null);
+            const isEditingTitle = ref(false);
+            const titleInput = ref(null);
+            const suggestions = ref([]);
+            const activeSearchIndex = ref(null);
+            const activeIconSelectorIndex = ref(null);
+            
+            // Share State
+            const showShareModal = ref(false);
+            const shareUrl = ref('');
+            const isCopied = ref(false);
+            const isGeneratingLink = ref(false);
+
+            const confirmModal = ref({ show: false, title: '', message: '', onConfirm: null, isDestructive: false });
+
+            let mapInstance = null;
+            let markers = [];
+            let polyline = null;
+            let sortableInstance = null;
+            
+            // pull-to-refresh
+            const pullDistance = ref(0);
+            const isRefreshing = ref(false);
+            let touchStartY = 0;
+
+            const handleTouchStart = (e) => {
+                // Only allow pull-to-refresh if scrolled to the top of the container
+                const scrollContainer = document.querySelector('main');
+                if (scrollContainer && scrollContainer.scrollTop === 0) {
+                    touchStartY = e.touches[0].pageY;
+                } else {
+                    touchStartY = 0;
+                }
+            };
+
+            const handleTouchMove = (e) => {
+                if (touchStartY === 0) return;
+                
+                const touchCurrentY = e.touches[0].pageY;
+                const diff = touchCurrentY - touchStartY;
+                
+                // Check if user is pulling DOWN and is at the top of the container
+                if (diff > 0) {
+                    const scrollContainer = e.currentTarget; // The <main> element
+                    if (scrollContainer.scrollTop <= 0) {
+                        // This is the critical line: stop the browser from "bouncing" the page
+                        if (e.cancelable) e.preventDefault(); 
+                        
+                        // Apply resistance so it feels natural
+                        pullDistance.value = Math.pow(diff, 0.8); 
+                    }
+                }
+            };
+
+            const handleTouchEnd = async () => {
+                if (pullDistance.value > 60) {
+                    isRefreshing.value = true;
+                    pullDistance.value = 80; // Keep indicator visible during reload
+                    
+                    try {
+                        await loadFromFirebase(); // Trigger your existing reload function
+                    } finally {
+                        setTimeout(() => {
+                            isRefreshing.value = false;
+                            pullDistance.value = 0;
+                        }, 500);
+                    }
+                } else {
+                    pullDistance.value = 0;
+                }
+                touchStartY = 0;
+            };
+
+            // Data (Active Trip)
+            const days = ref([]);
+            const expenses = ref([]);
+            const setup = ref({ destination: '', startDate: new Date().toISOString().split('T')[0], days: 3 });
+            
+            const newExpense = ref({ 
+                item: '', amount: '', currency: 'JPY', rate: 0.03, date: new Date().toISOString().split('T')[0], paidBy: 'Me',
+                splitMethod: 'equal', involved: ['Me'], splitDetails: { 'Me': 1 },
+                isSettled: false, settlements: {}
+            });
+
+            // Computed
+            const t = computed(() => i18n[locale.value]);
+            const currentDay = computed(() => days.value[currentDayIdx.value] || { items: [] });
+            const totalMYR = computed(() => expenses.value.reduce((sum, e) => sum + (e.amount * e.rate), 0));
+            const currentSplitSum = computed(() => {
+                if (newExpense.value.splitMethod === 'amount') {
+                        return Object.values(newExpense.value.splitDetails).reduce((sum, val) => sum + (Number(val)||0), 0);
+                }
+                return 0;
+            });
+
+            // interim solution
+            const isDark = computed(() => false);
+
+            // --- Database Functions ---
+
+            // Debounced Save to Firebase (prevents spamming writes)
+            const saveToFirebase = debounce(async () => {
+                if (!currentTripId.value) return;
+                
+                // Also save to LocalStorage as immediate backup
+                localStorage.setItem('travel_plans_v2', JSON.stringify(tripList.value));
+
+                const tripData = {
+                    id: currentTripId.value,
+                    setup: setup.value,
+                    days: days.value,
+                    expenses: expenses.value,
+                    travelers: travelers.value,
+                    updatedAt: new Date().toISOString()
+                };
+
+                try {
+                    // Save to 'trips' collection
+                    await setDoc(doc(db, "trips", currentTripId.value), tripData);
+                    console.log("Saved to Firebase");
+                } catch (e) {
+                    console.error("Error saving to Firebase:", e);
+                }
+            }, 2000); // 2 second delay
+
+            const loadFromFirebase = async () => {
+                try {
+                    const querySnapshot = await getDocs(collection(db, "trips"));
+                    const remoteTrips = [];
+                    querySnapshot.forEach((doc) => {
+                        remoteTrips.push(doc.data());
+                    });
+
+                    if (remoteTrips.length > 0) {
+                        tripList.value = remoteTrips;
+                        // Determine which trip to load (last accessed logic could go here)
+                        if (!currentTripId.value) {
+                             switchTrip(tripList.value[0].id);
+                        }
+                    } else {
+                        // If DB empty, fallback to local or create new
+                        const savedPlans = localStorage.getItem('travel_plans_v2');
+                        if (savedPlans) {
+                            tripList.value = JSON.parse(savedPlans);
+                            if(tripList.value.length > 0) switchTrip(tripList.value[0].id);
+                        } else {
+                            createNewTrip();
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error loading from Firebase:", e);
+                    // Fallback
+                    const savedPlans = localStorage.getItem('travel_plans_v2');
+                    if (savedPlans) tripList.value = JSON.parse(savedPlans);
+                }
+            };
+
+            // --- Helper Calculations (Same as before) ---
+            const getExpenseDebt = (exp, person) => { /* ... existing logic ... */ };
+            const getExpenseSettled = (exp, person) => { /* ... existing logic ... */ };
+            const getExpenseSettledAmount = (exp) => {
+                if(!exp.settlements) return 0;
+                return Object.values(exp.settlements).reduce((a,b)=>a+b, 0);
+            }
+            const calculateSplitAmount = (person) => {
+                const amt = Number(newExpense.value.amount) || 0;
+                if (newExpense.value.splitMethod === 'equal') {
+                        if (newExpense.value.involved.includes(person)) {
+                            return amt / (newExpense.value.involved.length || 1);
+                        }
+                        return 0;
+                } else if (newExpense.value.splitMethod === 'amount') {
+                    return Number(newExpense.value.splitDetails[person]) || 0;
+                } else if (newExpense.value.splitMethod === 'ratio') {
+                    const weights = newExpense.value.splitDetails;
+                    const totalWeight = Object.values(weights).reduce((s, v) => s + (Number(v)||0), 0);
+                    if (totalWeight === 0) return 0;
+                    return amt * ((Number(weights[person])||0) / totalWeight);
+                }
+                return 0;
+            };
+
+            const settlementPlan = computed(() => {
+                const activeExpenses = expenses.value.filter(e => !e.isSettled);
+                const breakdown = {};
+                travelers.value.forEach(p => breakdown[p] = { name: p, paid: 0, balance: 0 });
+                
+                activeExpenses.forEach(e => {
+                    const totalCostMYR = e.amount * e.rate;
+                    if(breakdown[e.paidBy]) breakdown[e.paidBy].paid += totalCostMYR;
+
+                    if (e.splitMethod === 'equal') {
+                        const share = totalCostMYR / (e.involved ? e.involved.length : travelers.value.length);
+                        (e.involved || travelers.value).forEach(p => { if(breakdown[p]) breakdown[p].balance -= share; });
+                    } else if (e.splitMethod === 'amount') {
+                        Object.entries(e.splitDetails).forEach(([p, amt]) => { if(breakdown[p]) breakdown[p].balance -= (amt * e.rate); });
+                    } else if (e.splitMethod === 'ratio') {
+                        const totalW = Object.values(e.splitDetails).reduce((s,v)=>s+(Number(v)||0),0);
+                        if(totalW>0) Object.entries(e.splitDetails).forEach(([p,w])=> { if(breakdown[p]) breakdown[p].balance -= totalCostMYR * (Number(w)/totalW); });
+                    }
+                });
+                Object.values(breakdown).forEach(p => p.balance += p.paid);
+                const debtors = Object.values(breakdown).filter(p => p.balance < -0.01).sort((a,b) => a.balance - b.balance);
+                const creditors = Object.values(breakdown).filter(p => p.balance > 0.01).sort((a,b) => b.balance - a.balance);
+                const transactions = [];
+                let i = 0, j = 0;
+                while(i < debtors.length && j < creditors.length) {
+                    const amount = Math.min(Math.abs(debtors[i].balance), creditors[j].balance);
+                    transactions.push({ from: debtors[i].name, to: creditors[j].name, amount: amount });
+                    debtors[i].balance += amount; creditors[j].balance -= amount;
+                    if(Math.abs(debtors[i].balance) < 0.01) i++;
+                    if(creditors[j].balance < 0.01) j++;
+                }
+                return { breakdown: Object.values(breakdown), transactions };
+            });
+
+            const settlementPlanByCurrency = computed(() => {
+                // Simplified logic from original for brevity in display
+                // (Logic remains identical to your working code)
+                const activeExpenses = expenses.value.filter(e => !e.isSettled);
+                const ledgers = {}; 
+                activeExpenses.forEach(e => {
+                    if (!ledgers[e.currency]) { ledgers[e.currency] = {}; travelers.value.forEach(p => ledgers[e.currency][p] = 0); }
+                });
+                activeExpenses.forEach(e => {
+                    const curr = e.currency;
+                    if(ledgers[curr][e.paidBy] !== undefined) ledgers[curr][e.paidBy] += e.amount;
+                    if (e.splitMethod === 'equal') {
+                        const share = e.amount / (e.involved ? e.involved.length : travelers.value.length);
+                        (e.involved || travelers.value).forEach(p => { if(ledgers[curr][p] !== undefined) ledgers[curr][p] -= share; });
+                    } else if (e.splitMethod === 'amount') {
+                        Object.entries(e.splitDetails).forEach(([p, amt]) => { if(ledgers[curr][p] !== undefined) ledgers[curr][p] -= Number(amt); });
+                    } else if (e.splitMethod === 'ratio') {
+                            const totalW = Object.values(e.splitDetails).reduce((s,v)=>s+(Number(v)||0),0);
+                            if(totalW>0) Object.entries(e.splitDetails).forEach(([p,w])=> { if(ledgers[curr][p] !== undefined) ledgers[curr][p] -= e.amount * (Number(w)/totalW); });
+                    }
+                });
+                const transactionsByCurrency = {};
+                Object.keys(ledgers).forEach(curr => {
+                    const balances = ledgers[curr];
+                    const debtors = Object.keys(balances).filter(p => balances[p] < -0.01).map(p => ({name: p, balance: balances[p]})).sort((a,b) => a.balance - b.balance);
+                    const creditors = Object.keys(balances).filter(p => balances[p] > 0.01).map(p => ({name: p, balance: balances[p]})).sort((a,b) => b.balance - a.balance);
+                    const txs = [];
+                    let i=0, j=0;
+                    while(i < debtors.length && j < creditors.length) {
+                            const amount = Math.min(Math.abs(debtors[i].balance), creditors[j].balance);
+                            txs.push({ from: debtors[i].name, to: creditors[j].name, amount: amount });
+                            debtors[i].balance += amount; creditors[j].balance -= amount;
+                            if(Math.abs(debtors[i].balance) < 0.01) i++;
+                            if(creditors[j].balance < 0.01) j++;
+                    }
+                    if(txs.length > 0) transactionsByCurrency[curr] = txs;
+                });
+                return transactionsByCurrency;
+            });
+
+            const transactionsGroupedByPerson = computed(() => {
+                const byCurrency = settlementPlanByCurrency.value;
+                const grouped = {}; 
+                Object.entries(byCurrency).forEach(([currency, txs]) => {
+                    txs.forEach(tx => {
+                        const key = `${tx.from}|${tx.to}`;
+                        if (!grouped[key]) grouped[key] = { from: tx.from, to: tx.to, debts: [] };
+                        grouped[key].debts.push({ currency, amount: tx.amount });
+                    });
+                });
+                return Object.values(grouped);
+            });
+
+            // --- Methods ---
+
+            // Helper to auto-resize all notes on the current day
+            const refreshAllNotesHeights = () => {
+                nextTick(() => {
+                    const textareas = document.querySelectorAll('textarea');
+                    textareas.forEach(el => {
+                        el.style.height = 'auto';
+                        el.style.height = el.scrollHeight + 'px';
+                    });
+                });
+            };
+
+            // Watch for day switching to fix layout and heights
+            watch(currentDayIdx, () => {
+                refreshAllNotesHeights();
+                // If you are using the map, you might also want to update markers here
+            });
+
+            // Also trigger it when switching trips
+            watch(currentTripId, () => {
+                refreshAllNotesHeights();
+            });
+
+
+            const initGoogleAutocomplete = (idx) => {
+                const input = document.getElementById('location-input-' + idx);
+                if (!input || input.dataset.initialized) return;
+
+                const autocomplete = new google.maps.places.Autocomplete(input, {
+                    // Ensure 'name' is included in fields
+                    fields: ['name', 'formatted_address', 'geometry']
+                });
+
+                input.dataset.initialized = "true";
+
+                autocomplete.addListener('place_changed', () => {
+                    const place = autocomplete.getPlace();
+                    if (!place.geometry) return;
+
+                    const item = currentDay.value.items[idx];
+                    
+                    // CHANGE THIS LINE: Use place.name for the display
+                    // Fallback to formatted_address only if name is missing
+                    item.location = place.name || place.formatted_address;
+                    
+                    item.coords = {
+                        lat: place.geometry.location.lat(),
+                        lng: place.geometry.location.lng()
+                    };
+                    
+                    saveCurrentTripDebounced();
+                    fetchWeather(item);
+                    if (viewMode.value === 'map') initMap();
+                });
+            };
+            
+            const fetchRate = async (currency) => {
+                if (currency === 'MYR') { newExpense.value.rate = 1; return; }
+                isLoadingRate.value = true;
+                try {
+                    const res = await fetch(`https://api.exchangerate-api.com/v4/latest/${currency}`);
+                    const data = await res.json();
+                    if(data.rates && data.rates.MYR) newExpense.value.rate = data.rates.MYR;
+                } catch(e) { console.error("Rate fetch failed", e); } finally { isLoadingRate.value = false; }
+            };
+
+            watch(() => newExpense.value.currency, (newVal) => fetchRate(newVal));
+
+            const quickSettle = async (from, to, amount, currency) => {
+                if (amount <= 0) return;
+                let rate = 1;
+                if (currency !== 'MYR') {
+                    const existing = expenses.value.find(e => e.currency === currency);
+                    rate = existing ? existing.rate : 1; 
+                }
+                const settlementExpense = {
+                    item: `Settlement to ${to}`, amount: amount, currency: currency, rate: rate,
+                    date: new Date().toISOString().split('T')[0], paidBy: from,
+                    splitMethod: 'amount', involved: [], splitDetails: { [to]: amount },
+                    type: 'settlement', isSettled: false
+                };
+                expenses.value.unshift(settlementExpense);
+                // Trigger Save
+                saveCurrentTripDebounced();
+            };
+
+            const toggleExpenseSettled = (exp) => {
+                exp.isSettled = !exp.isSettled;
+                saveCurrentTripDebounced();
+            };
+
+            const toggleLang = () => {
+                locale.value = locale.value === 'zh' ? 'en' : 'zh';
+                localStorage.setItem('lang', locale.value);
+            };
+
+            const toggleInvolved = (person) => {
+                const idx = newExpense.value.involved.indexOf(person);
+                if (idx > -1) { if(newExpense.value.involved.length > 1) newExpense.value.involved.splice(idx, 1); } 
+                else { newExpense.value.involved.push(person); }
+            };
+
+            const formatDate = (dateStr) => {
+                if (!dateStr) return '';
+                const [y, m, d] = dateStr.split('-').map(Number);
+                const date = new Date(y, m - 1, d);
+                const weekDays = locale.value === 'zh' ? ['日','一','二','三','四','五','六'] : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} (${weekDays[date.getDay()]})`;
+            };
+            
+            const formatTabDate = (dateStr) => {
+                if (!dateStr) return '';
+                const [y, m, d] = dateStr.split('-').map(Number);
+                return `${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+            };
+
+            const formatTabDayOfWeek = (dateStr) => {
+                if (!dateStr) return '';
+                const [y, m, d] = dateStr.split('-').map(Number);
+                const date = new Date(y, m - 1, d);
+                const weekDays = locale.value === 'zh' ? ['週日','週一','週二','週三','週四','週五','週六'] : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                return weekDays[date.getDay()];
+            };
+            
+            const addTraveler = () => {
+                const name = newTravelerName.value.trim();
+                if(name && !travelers.value.includes(name)) {
+                    travelers.value.push(name);
+                    if(!newExpense.value.involved.includes(name)) newExpense.value.involved.push(name);
+                    newExpense.value.splitDetails[name] = 0;
+                    newTravelerName.value = '';
+                    saveCurrentTripDebounced();
+                }
+            };
+            
+            const removeTraveler = (idx) => {
+                const name = travelers.value[idx];
+                const hasExpenses = expenses.value.some(e => e.paidBy === name || (e.splitDetails && e.splitDetails[name]) || (e.involved && e.involved.includes(name)));
+                if(hasExpenses) {
+                    showConfirm('Warning', `Cannot remove ${name} because they are part of existing expenses.`, false, () => {});
+                    return;
+                }
+                travelers.value.splice(idx, 1);
+                const invIdx = newExpense.value.involved.indexOf(name);
+                if(invIdx > -1) newExpense.value.involved.splice(invIdx, 1);
+                delete newExpense.value.splitDetails[name];
+                saveCurrentTripDebounced();
+            };
+            
+            const startEditingMember = (idx) => {
+                editingTravelerIdx.value = idx;
+                editingTravelerName.value = travelers.value[idx];
+                nextTick(() => {
+                    if (editMemberInput.value) {
+                        const el = Array.isArray(editMemberInput.value) ? editMemberInput.value[0] : editMemberInput.value;
+                        if(el) el.focus();
+                    }
+                });
+            };
+
+            const saveMemberName = (idx) => {
+                if (editingTravelerIdx.value === null) return;
+                const oldName = travelers.value[idx];
+                const newName = editingTravelerName.value.trim();
+                if (newName && newName !== oldName && !travelers.value.includes(newName)) {
+                    travelers.value[idx] = newName;
+                    expenses.value.forEach(e => {
+                        if (e.paidBy === oldName) e.paidBy = newName;
+                        if (e.involved) { const i = e.involved.indexOf(oldName); if (i !== -1) e.involved[i] = newName; }
+                        if (e.splitDetails && e.splitDetails.hasOwnProperty(oldName)) { e.splitDetails[newName] = e.splitDetails[oldName]; delete e.splitDetails[oldName]; }
+                        if (e.settlements && e.settlements.hasOwnProperty(oldName)) { e.settlements[newName] = e.settlements[oldName]; delete e.settlements[oldName]; }
+                    });
+                    if (newExpense.value.paidBy === oldName) newExpense.value.paidBy = newName;
+                    if (newExpense.value.involved) { const i = newExpense.value.involved.indexOf(oldName); if (i !== -1) newExpense.value.involved[i] = newName; }
+                    if (newExpense.value.splitDetails && newExpense.value.splitDetails.hasOwnProperty(oldName)) { newExpense.value.splitDetails[newName] = newExpense.value.splitDetails[oldName]; delete newExpense.value.splitDetails[oldName]; }
+                    saveCurrentTripDebounced();
+                }
+                editingTravelerIdx.value = null;
+                editingTravelerName.value = '';
+            };
+
+            const startEditTitle = () => { isEditingTitle.value = true; nextTick(() => { titleInput.value.focus(); }); };
+            const stopEditTitle = () => { isEditingTitle.value = false; saveCurrentTripDebounced(); };
+            const adjustHeight = (el) => { if(!el) return; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; };
+            const getDotColor = (type) => {
+                const colors = { spot: 'bg-blue-500', food: 'bg-orange-500', car: 'bg-green-500', reminder: 'bg-purple-500', accommodation: 'bg-indigo-500', activity: 'bg-pink-500', flight: 'bg-sky-500', train: 'bg-gray-600', boat: 'bg-cyan-600', settlement: 'bg-emerald-500' };
+                return colors[type] || 'bg-gray-400';
+            };
+            
+            const isTicketType = (type) => ['flight', 'train', 'boat', 'bus'].includes(type);
+            const getTicketClass = (type) => { 
+                if (type === 'flight') return 'bg-gradient-to-br from-blue-500 to-green-500'; 
+                if (type === 'train') return 'bg-gradient-to-br from-gray-700 to-black'; 
+                if (type === 'boat') return 'bg-gradient-to-br from-cyan-500 to-blue-600'; 
+                if (type === 'bus') return 'bg-gradient-to-br from-yellow-500 to-orange-600'; // Added Bus Color
+                return ''; 
+            };
+            const getTicketIcon = (type) => { 
+                if (type === 'flight') return 'ph-airplane-tilt'; 
+                if (type === 'train') return 'ph-train'; 
+                if (type === 'boat') return 'ph-boat'; 
+                if (type === 'bus') return 'ph-bus'; // Added Bus Icon
+                return 'ph-ticket'; 
+            };
+            const getTicketPlaceholder = (type) => { 
+                if (type === 'flight') return t.value.flightNo; 
+                if (type === 'train') return t.value.trainNo; 
+                if (type === 'boat') return t.value.boatCompany; 
+                if (type === 'bus') return t.value.busNo; // Added Bus Placeholder
+                return t.value.ticketNo; 
+            };
+            const navBtnClass = (mode) => { 
+                const isActive = viewMode.value === mode; 
+                return isActive ? 'bg-white text-[#1a73e8] shadow-sm' : 'text-gray-500 hover:text-gray-700'; 
+            };
+
+            const getDayTabClass = (index) => { 
+                if (currentDayIdx.value === index) return 'bg-[#e8f0fe] text-[#1967d2] font-bold'; 
+                return 'bg-white text-gray-500 hover:bg-gray-50'; 
+            };
+            const scrollDay = (direction) => { if (direction === 'prev' && currentDayIdx.value > 0) currentDayIdx.value--; else if (direction === 'next' && currentDayIdx.value < days.value.length - 1) currentDayIdx.value++; };
+
+            const showConfirm = (title, message, isDestructive, onConfirm) => {
+                confirmModal.value = { show: true, title, message, isDestructive, onConfirm: () => { onConfirm(); confirmModal.value.show = false; } };
+            };
+
+            const openMap = (loc) => { if (!loc) return; window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}`, '_blank'); };
+
+            const searchLocation = debounce(async (index, query) => {
+                if (!query || query.length < 2) { suggestions.value = []; return; }
+                activeSearchIndex.value = index;
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&accept-language=${locale.value}`);
+                    const data = await response.json();
+                    suggestions.value = data;
+                } catch (e) { console.error('Search failed', e); }
+            }, 400);
+
+            const onLocationInput = (index, value) => { currentDay.value.items[index].location = value; searchLocation(index, value); };
+            const selectLocation = (item, location) => { item.location = location.display_name; if (location.lat && location.lon) item.coords = { lat: location.lat, lng: location.lon }; suggestions.value = []; activeSearchIndex.value = null; saveCurrentTripDebounced(); fetchWeather(item); };
+            const closeSuggestions = () => { setTimeout(() => { activeSearchIndex.value = null; suggestions.value = []; }, 200); };
+            const toggleIconSelector = (idx) => { activeIconSelectorIndex.value = activeIconSelectorIndex.value === idx ? null : idx; };
+            const closeIconSelector = () => { setTimeout(() => activeIconSelectorIndex.value = null, 200); };
+            const selectActivityIcon = (item, icon) => { item.icon = icon; activeIconSelectorIndex.value = null; saveCurrentTripDebounced(); };
+            const updateItemType = (item, newType) => { item.type = newType; if (newType === 'reminder' && item.time === '10:00') item.time = ''; if (newType === 'activity' && !item.icon) item.icon = 'ph-coffee'; saveCurrentTripDebounced(); };
+            const toggleDayOffset = (item) => { const current = item.arrOffset || 0; item.arrOffset = (current === 0 ? 1 : (current === 1 ? -1 : 0)); saveCurrentTripDebounced(); };
+            const getDayOffsetLabel = (offset) => { if (offset === 1) return '+1 Day'; if (offset === -1) return '-1 Day'; return 'Same Day'; };
+            const getDayOffsetClass = (offset) => { if (offset === 1) return 'bg-red-500 text-white border-red-500 shadow-sm'; if (offset === -1) return 'bg-orange-500 text-white border-orange-500 shadow-sm'; return 'bg-white/20 text-white/70 border-transparent hover:bg-white/30'; };
+            
+            const safeShowPicker = (event) => { try { if(event.target && event.target.showPicker) event.target.showPicker(); } catch(e) {} };
+            const onTimeFocus = (item, event) => { event.target.type = 'time'; safeShowPicker(event); };
+            const onTimeClick = (event) => { if (event.target.type === 'time') safeShowPicker(event); };
+            const onTimeBlur = (item, event) => { if (!item.time) event.target.type = 'text'; };
+
+            const getWeatherIcon = (code) => {
+                if (code === 0) return '☀️';
+                if (code >= 1 && code <= 3) return '⛅';
+                if (code >= 45 && code <= 48) return '🌫️';
+                if (code >= 51 && code <= 67) return '🌧️';
+                if (code >= 71 && code <= 77) return '❄️';
+                if (code >= 80 && code <= 82) return '🌧️';
+                if (code >= 95 && code <= 99) return '⛈️';
+                return '🌡️';
+            };
+
+            const fetchWeather = async (item) => {
+                if (!item.coords || !item.coords.lat || !item.coords.lng) return;
+                
+                const dateStr = currentDay.value.fullDate;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const targetDate = new Date(dateStr);
+                
+                const diffTime = targetDate - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                // Limit to 15 days as requested
+                if (diffDays > 15 || diffDays < 0) {
+                    item.weather = null; 
+                    return;
+                }
+
+                try {
+                    const url = `https://api.open-meteo.com/v1/forecast?latitude=${item.coords.lat}&longitude=${item.coords.lng}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data.daily && data.daily.time.length > 0) {
+                        item.weather = { 
+                            code: data.daily.weathercode[0], 
+                            max: data.daily.temperature_2m_max[0], 
+                            min: data.daily.temperature_2m_min[0] 
+                        };
+                        saveCurrentTripDebounced();
+                    }
+                } catch (e) { console.error("Weather fetch failed", e); }
+            };
+
+            const refreshCurrentDayWeather = () => {
+                if (!currentDay.value || !currentDay.value.items) return;
+                currentDay.value.items.forEach(item => { if (item.location && item.coords && !isTicketType(item.type) && item.type !== 'car') fetchWeather(item); });
+            };
+
+            const createNewTrip = () => {
+                showTripMenu.value = false;
+                setup.value = { destination: '', startDate: new Date().toISOString().split('T')[0], days: 3 };
+                days.value = []; expenses.value = []; travelers.value = ['Me']; currentTripId.value = null; showSetupModal.value = true;
+            };
+
+            const initTrip = () => {
+                if (!setup.value.destination) return;
+                const newDays = [];
+                const [y, m, d] = setup.value.startDate.split('-').map(Number);
+                for(let i=0; i<setup.value.days; i++) {
+                    const curr = new Date(y, m - 1, d + i); 
+                    const dateStr = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, '0')}-${String(curr.getDate()).padStart(2, '0')}`;
+                    newDays.push({ fullDate: dateStr, title: '', items: [] });
+                }
+                days.value = newDays; expenses.value = []; travelers.value = ['Me'];
+                
+                // Generate a Firestore-friendly ID (timestamp based is fine for simple usage)
+                const newId = Date.now().toString();
+                
+                const newTrip = {
+                    id: newId,
+                    setup: { ...setup.value },
+                    days: newDays,
+                    expenses: [],
+                    travelers: ['Me']
+                };
+                
+                tripList.value.push(newTrip);
+                currentTripId.value = newId;
+                
+                // Save immediately
+                saveToFirebase(); 
+                
+                showSetupModal.value = false;
+            };
+
+            const switchTrip = (id) => {
+                const target = tripList.value.find(t => t.id === id);
+                if(target) {
+                    currentTripId.value = id;
+                    setup.value = JSON.parse(JSON.stringify(target.setup));
+                    days.value = JSON.parse(JSON.stringify(target.days));
+                    expenses.value = JSON.parse(JSON.stringify(target.expenses || []));
+                    travelers.value = target.travelers && target.travelers.length ? JSON.parse(JSON.stringify(target.travelers)) : ['Me'];
+                    currentDayIdx.value = 0;
+                    showTripMenu.value = false;
+                }
+            };
+
+            const tryDeleteTrip = (id) => {
+                showConfirm(
+                    locale.value === 'zh' ? '刪除行程?' : 'Delete Trip?',
+                    locale.value === 'zh' ? '此操作無法復原。' : 'This action cannot be undone.',
+                    true,
+                    async () => { // Make this async
+                        try {
+                            // 1. Delete from Firebase Database
+                            await deleteDoc(doc(db, "trips", id));
+
+                            // 2. Remove from Local List
+                            const idx = tripList.value.findIndex(t => t.id === id);
+                            if(idx !== -1) {
+                                tripList.value.splice(idx, 1);
+                                
+                                // 3. Switch view if we deleted the active trip
+                                if(currentTripId.value === id) {
+                                    if(tripList.value.length > 0) {
+                                        switchTrip(tripList.value[0].id);
+                                    } else {
+                                        createNewTrip();
+                                    }
+                                }
+                                
+                                // Update local storage backup
+                                localStorage.setItem('travel_plans_v2', JSON.stringify(tripList.value));
+                            }
+                        } catch (e) {
+                            console.error("Error deleting trip:", e);
+                            alert("Failed to delete trip. Please try again.");
+                        }
+                    }
+                );
+            };
+            
+            // --- Helper Wrapper for saving ---
+            const saveCurrentTripDebounced = () => {
+                if(!currentTripId.value) return;
+                const targetIdx = tripList.value.findIndex(t => t.id === currentTripId.value);
+                if(targetIdx !== -1) {
+                    tripList.value[targetIdx] = {
+                        id: currentTripId.value,
+                        setup: { ...setup.value },
+                        days: JSON.parse(JSON.stringify(days.value)),
+                        expenses: JSON.parse(JSON.stringify(expenses.value)),
+                        travelers: JSON.parse(JSON.stringify(travelers.value))
+                    };
+                    saveToFirebase();
+                }
+            };
+
+            const tryDeleteDay = () => {
+                if(days.value.length <= 1) { showConfirm('Info', locale.value === 'zh' ? '至少需要保留一天。' : 'You must have at least one day.', false, () => {}); return; }
+                showConfirm(locale.value === 'zh' ? '刪除此日?' : 'Delete Day?', locale.value === 'zh' ? '確認刪除這一天的行程？' : 'Are you sure you want to delete this day?', true, () => {
+                    days.value.splice(currentDayIdx.value, 1);
+                    setup.value.days = days.value.length;
+                    if(currentDayIdx.value >= days.value.length) currentDayIdx.value = days.value.length - 1;
+                    saveCurrentTripDebounced();
+                });
+            };
+
+            const addDay = () => {
+                const lastDateStr = days.value.length > 0 ? days.value[days.value.length-1].fullDate : setup.value.startDate;
+                const [y, m, d] = lastDateStr.split('-').map(Number);
+                const nextDate = new Date(y, m - 1, d);
+                if (days.value.length > 0) nextDate.setDate(nextDate.getDate() + 1);
+                const dateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
+                days.value.push({ fullDate: dateStr, title: '', items: [] });
+                setup.value.days = days.value.length;
+                currentDayIdx.value = days.value.length - 1;
+                saveCurrentTripDebounced();
+            };
+
+            const addItem = () => { 
+                currentDay.value.items.push({ 
+                    // 1. Unique ID is critical to fix the "Notes not loading" bug
+                    id: Date.now() + Math.random(), 
+                    
+                    time: '', 
+                    type: 'spot', 
+                    activity: '', 
+                    location: '', 
+                    coords: null, 
+                    note: '', 
+                    
+                    // 2. Settlement Properties
+                    price: 0, 
+                    currency: setup.value.baseCurrency || 'MYR', 
+                    
+                    // 3. Involvement (Pre-fill with all travelers)
+                    involved: [...travelers.value], 
+                    isSettled: false, 
+                    
+                    // 4. UI State
+                    weather: null, 
+                    isEditingTime: false, 
+                    dayOffset: 0,
+                    arrOffset: 0
+                }); 
+                
+                // Trigger your save function
+                saveCurrentTripDebounced(); 
+            };
+            const removeItem = (idx) => { currentDay.value.items.splice(idx, 1); saveCurrentTripDebounced(); };
+            
+            const addExpense = () => {
+                if(!newExpense.value.item || !newExpense.value.amount) return;
+                if(newExpense.value.splitMethod === 'amount' && Math.abs(currentSplitSum.value - newExpense.value.amount) > 1) return;
+                if(!newExpense.value.date) newExpense.value.date = new Date().toISOString().split('T')[0];
+                if(!newExpense.value.paidBy) newExpense.value.paidBy = travelers.value[0];
+                const expenseToAdd = { ...newExpense.value, involved: [...newExpense.value.involved], splitDetails: { ...newExpense.value.splitDetails }, isSettled: false };
+                expenses.value.unshift(expenseToAdd);
+                newExpense.value.item = ''; newExpense.value.amount = '';
+                if(newExpense.value.splitMethod === 'amount') Object.keys(newExpense.value.splitDetails).forEach(k => newExpense.value.splitDetails[k] = 0);
+                saveCurrentTripDebounced();
+            };
+
+            // --- Updated Short Share Link Logic ---
+            const sharePlan = async () => {
+                isGeneratingLink.value = true;
+                const data = { id: currentTripId.value, s: setup.value, d: days.value, e: expenses.value, t: travelers.value };
+                
+                try {
+                    // Create a new document in 'shared_plans' collection
+                    const shareRef = doc(collection(db, "shared_plans"));
+                    await setDoc(shareRef, data);
+                    
+                    // Generate short URL using the Document ID
+                    const url = window.location.origin + window.location.pathname + '?s=' + shareRef.id;
+                    shareUrl.value = url;
+                    isCopied.value = false;
+                    showShareModal.value = true;
+                } catch (e) {
+                    console.error("Share failed", e);
+                    alert("Failed to generate link. Please check connection.");
+                } finally {
+                    isGeneratingLink.value = false;
+                }
+            };
+
+            const copyLink = async () => {
+                try {
+                    await navigator.clipboard.writeText(shareUrl.value);
+                    isCopied.value = true;
+                } catch (err) {
+                    const input = document.createElement('input'); input.value = shareUrl.value; document.body.appendChild(input); input.select();
+                    try { document.execCommand('copy'); isCopied.value = true; } catch (e) {} document.body.removeChild(input);
+                }
+            };
+           
+            const initMap = async () => {
+                await nextTick();
+                const mapEl = document.getElementById('map');
+                if (!mapEl) return;
+
+                // 1. Initialize Map if it doesn't exist
+                if (!mapInstance) {
+                    mapInstance = new google.maps.Map(mapEl, {
+                        center: { lat: 3.1390, lng: 101.6869 }, 
+                        zoom: 13,
+                        disableDefaultUI: false,
+                        mapTypeControl: false,
+                        streetViewControl: false,
+                        styles: [] 
+                    });
+                } else {
+                    // 2. CRITICAL FIX: Trigger resize and re-center when returning to the tab
+                    google.maps.event.trigger(mapInstance, "resize");
+                }
+
+                // 3. Clear existing markers and polyline
+                markers.forEach(m => m.setMap(null));
+                markers = [];
+                if (polyline) polyline.setMap(null);
+
+                const itemsWithLocation = currentDay.value.items.filter(i => i.location && i.coords);
+                const path = [];
+                const bounds = new google.maps.LatLngBounds();
+
+                if (itemsWithLocation.length === 0) {
+                    // If no locations, just show a default view
+                    return;
+                }
+
+                itemsWithLocation.forEach((item, index) => {
+                    const position = { lat: Number(item.coords.lat), lng: Number(item.coords.lng) };
+                    const marker = new google.maps.Marker({
+                        position,
+                        map: mapInstance,
+                        label: { text: (index + 1).toString(), color: "white", fontWeight: "bold" },
+                        title: item.activity || item.location
+                    });
+                    markers.push(marker);
+                    path.push(position);
+                    bounds.extend(position);
+                });
+
+                if (path.length > 1) {
+                    polyline = new google.maps.Polyline({
+                        path: path,
+                        geodesic: true,
+                        strokeColor: '#1a73e8',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 3
+                    });
+                    polyline.setMap(mapInstance);
+                }
+
+                // 4. Re-fit the bounds every time the view is refreshed
+                mapInstance.fitBounds(bounds);
+                if (path.length === 1) mapInstance.setZoom(15);
+            };
+
+            const initSortable = () => {
+                if (sortableInstance) sortableInstance.destroy();
+                if (!sortableList.value) return;
+
+                sortableInstance = new Sortable(sortableList.value, {
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    dragClass: 'sortable-drag',
+                    handle: '.cursor-move',
+                    
+                    // --- ADD THESE OPTIONS FOR "HOLD AND DRAG" ---
+                    delay: 400, // Time in milliseconds to hold before dragging starts
+                    delayOnTouchOnly: true, // Only apply the delay on mobile/touch devices
+                    touchStartThreshold: 5, // Pixels the finger can move before canceling the long-press
+                    // ---------------------------------------------
+
+                    onEnd: (evt) => {
+                        const { oldIndex, newIndex } = evt;
+                        if (oldIndex === newIndex) return;
+                        const movedItem = currentDay.value.items.splice(oldIndex, 1)[0];
+                        currentDay.value.items.splice(newIndex, 0, movedItem);
+                        saveCurrentTripDebounced();
+                    }
+                });
+            };
+
+            watch([days, expenses, setup, travelers], () => { saveCurrentTripDebounced(); }, { deep: true });
+            watch(viewMode, (v) => { if (v === 'map') initMap(); if (v === 'plan') { refreshCurrentDayWeather(); nextTick(initSortable); refreshAllNotesHeights();} });
+            watch(currentDayIdx, (newVal) => { refreshCurrentDayWeather(); if (viewMode.value === 'map') initMap(); nextTick(() => { if(daysContainer.value && daysContainer.value.children[newVal]) daysContainer.value.children[newVal].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }); });
+
+            onMounted(async () => {
+                isLoading.value = true; // Start loading
+
+                // 1. Network Status Listeners
+                window.addEventListener('online', () => { isOnline.value = true; });
+                window.addEventListener('offline', () => { isOnline.value = false; });
+                
+                const urlParams = new URLSearchParams(window.location.search);
+                const shareId = urlParams.get('s'); 
+                
+                try {
+                    if (shareId) {
+                        // 2. Handle Shared Plan Import
+                        const docRef = doc(db, "shared_plans", shareId);
+                        const docSnap = await getDoc(docRef);
+                        
+                        if (docSnap.exists()) {
+                            const decoded = docSnap.data();
+                            const tripId = decoded.id || Date.now().toString();
+                            const importedTrip = { id: tripId, setup: decoded.s, days: decoded.d, expenses: decoded.e, travelers: decoded.t || ['Me'] };
+                            
+                            tripList.value = [importedTrip];
+                            currentTripId.value = tripId;
+                            switchTrip(tripId);
+                            saveToFirebase();
+                            
+                            // Clean URL
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        } else {
+                            alert("Shared plan not found!");
+                            await loadFromFirebase();
+                        }
+                    } else {
+                        // 3. Standard Load from Firestore
+                        await loadFromFirebase();
+                    }
+
+                    // 4. Initialize UI Components
+                    refreshCurrentDayWeather();
+                    if (viewMode.value === 'plan') nextTick(initSortable);
+                    if (viewMode.value === 'map') nextTick(initMap);
+
+                    // 5. Global Listeners
+                    document.addEventListener("visibilitychange", () => { 
+                        if (document.visibilityState === 'visible') refreshCurrentDayWeather(); 
+                    });
+
+                    // 6. Fix for pull-to-refresh: Prevent browser "bounce"
+                    const mainEl = document.querySelector('main');
+                    if (mainEl) {
+                        mainEl.addEventListener('touchmove', (e) => {
+                            if (mainEl.scrollTop <= 0 && e.touches[0].pageY > touchStartY) {
+                                if (e.cancelable) e.preventDefault();
+                            }
+                        }, { passive: false });
+                    }
+
+                } catch (error) {
+                    console.error("Initialization failed:", error);
+                } finally {
+                    // 7. Hide loading screen after a small delay for smooth transition
+                    setTimeout(() => {
+                        isLoading.value = false;
+                    }, 800);
+                }
+            });
+
+            return {
+                locale, t, toggleLang, viewMode, currentDayIdx, days, currentDay, setup, showSetupModal, showTripMenu, initTrip, createNewTrip, addItem, removeItem, getDotColor,
+                expenses, newExpense, addExpense, totalMYR, sharePlan, navBtnClass, addDay, tryDeleteDay, daysContainer, scrollDay, showShareModal, shareUrl, copyLink, isCopied,
+                isEditingTitle, titleInput, startEditTitle, stopEditTitle, tripList, switchTrip, tryDeleteTrip, currentTripId, getDayTabClass, confirmModal, formatDate,
+                adjustHeight, openMap, updateItemType, searchLocation, onLocationInput, selectLocation, suggestions, activeSearchIndex, closeSuggestions,
+                onTimeFocus, onTimeBlur, onTimeClick, toggleDayOffset, getDayOffsetLabel, getDayOffsetClass, getWeatherIcon, fetchWeather,
+                isTicketType, getTicketClass, getTicketIcon, getTicketPlaceholder, activityIcons, activeIconSelectorIndex, toggleIconSelector, closeIconSelector, selectActivityIcon, safeShowPicker,
+                travelers, newTravelerName, addTraveler, removeTraveler, showSettlement, settlementPlan, toggleInvolved, calculateSplitAmount, currentSplitSum, settlementMode, settlementPlanByCurrency,
+                isLoadingRate, toggleExpenseSettled, transactionsGroupedByPerson, getExpenseSettledAmount, quickSettle, editingTravelerIdx, editingTravelerName, editMemberInput, startEditingMember, saveMemberName, 
+                formatTabDate, dateInputRef, setupDateRef, formatTabDayOfWeek, sortableList,
+                isOnline, isGeneratingLink, 
+                initGoogleAutocomplete, //google
+                refreshAllNotesHeights, //refresh notes
+                pullDistance, //pull-to-refresh
+                isRefreshing,
+                handleTouchStart,
+                handleTouchMove,
+                handleTouchEnd,
+                isLoading,
+                isDark
+            }
+        }
+    }).mount('#app')
+</script>
+    <style>
+        .animate-fade { animation: fade 0.3s ease-out; }
+        @keyframes fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+
+
+</body>
+</html>
