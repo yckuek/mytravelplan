@@ -1086,10 +1086,16 @@
             const handleTouchEnd = async () => {
                 if (pullDistance.value > 60) {
                     isRefreshing.value = true;
-                    pullDistance.value = 80; // Keep indicator visible during reload
+                    pullDistance.value = 80;
                     
                     try {
-                        await loadFromFirebase(); // Trigger your existing reload function
+                        await loadFromFirebase();
+                        
+                        // Ensure UI components re-align after the new data is set
+                        nextTick(() => {
+                            refreshAllNotesHeights();
+                            if (viewMode.value === 'map') initMap();
+                        });
                     } finally {
                         setTimeout(() => {
                             isRefreshing.value = false;
@@ -1173,38 +1179,32 @@
                     if (remoteTrips.length > 0) {
                         tripList.value = remoteTrips;
                         
-                        // --- ADD THIS LOGIC TO REFRESH CURRENT DATA ---
+                        // --- NEW REFRESH LOGIC ---
                         if (currentTripId.value) {
-                            // Find the updated version of the current trip from the new list
+                            // Find the fresh version of the trip you are currently looking at
                             const updatedActiveTrip = remoteTrips.find(t => t.id === currentTripId.value);
                             if (updatedActiveTrip) {
-                                // Manually update the reactive refs being used in the UI
+                                // Force overwrite the local reactive state with the new remote data
                                 setup.value = JSON.parse(JSON.stringify(updatedActiveTrip.setup));
                                 days.value = JSON.parse(JSON.stringify(updatedActiveTrip.days));
                                 expenses.value = JSON.parse(JSON.stringify(updatedActiveTrip.expenses || []));
                                 travelers.value = updatedActiveTrip.travelers?.length 
                                     ? JSON.parse(JSON.stringify(updatedActiveTrip.travelers)) 
                                     : ['Me'];
+                                
+                                // Trigger height refresh for notes if you switched back to Plan view
+                                nextTick(() => refreshAllNotesHeights());
                             }
                         } else {
-                            // If no trip is active, load the first one found
                             switchTrip(tripList.value[0].id);
                         }
-                        // ----------------------------------------------
+                        // -------------------------
                         
                     } else {
-                        const savedPlans = localStorage.getItem('travel_plans_v2');
-                        if (savedPlans) {
-                            tripList.value = JSON.parse(savedPlans);
-                            if(tripList.value.length > 0) switchTrip(tripList.value[0].id);
-                        } else {
-                            createNewTrip();
-                        }
+                        // ... (rest of your existing localStorage fallback)
                     }
                 } catch (e) {
                     console.error("Error loading from Firebase:", e);
-                    const savedPlans = localStorage.getItem('travel_plans_v2');
-                    if (savedPlans) tripList.value = JSON.parse(savedPlans);
                 }
             };
 
