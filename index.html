@@ -167,10 +167,23 @@
         select::-ms-expand {
             display: none;
         }
+
+        /* Fix for iOS dynamic height and notch */
+        :root {
+            --sat: env(safe-area-inset-top);
+        }
+
+        #app {
+            height: 100dvh; /* Dynamic viewport height handles Safari UI changes */
+        }
+
+        header {
+            padding-top: max(12px, var(--sat));
+        }
     </style>
 </head>
-<body class="bg-[#f0f2f5] text-[#3c4043] h-screen flex flex-col overflow-hidden transition-theme">
-    <div id="app"  class="flex flex-col h-full max-w-md mx-auto w-full relative sm:rounded-xl sm:my-4 sm:h-[95vh] border transition-theme overflow-hidden bg-white border-gray-200 google-shadow">
+<body class="bg-[#f0f2f5] text-[#3c4043] h-[100dvh] flex flex-col overflow-hidden transition-theme">
+    <div id="app" class="flex flex-col h-full max-w-md mx-auto w-full relative sm:rounded-xl sm:my-4 sm:h-[95dvh] border transition-theme overflow-hidden bg-white border-gray-200 google-shadow">
             <div v-if="isLoading" class="absolute inset-0 z-[10000] flex flex-col items-center justify-center bg-white transition-opacity duration-500">
                 <div class="relative w-24 h-24 mb-4">
                     <div class="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
@@ -193,7 +206,7 @@
             <div v-if="!isOnline" class="bg-red-500 text-white text-xs font-bold text-center py-1 z-[9999] transition-all">
                  {{ locale === 'zh' ? '⚠️ 無網路連線 - 使用離線模式 (資料將在連線後同步)' : '⚠️ No Internet - Offline Mode (Data syncs when online)' }}
             </div>
-        <header class="shrink-0 z-20 border-b transition-theme px-4 py-3 bg-white text-[#3c4043] border-gray-200">
+        <header class="shrink-0 z-20 border-b transition-theme px-4 pb-3 pt-[env(safe-area-inset-top,12px)] bg-white text-[#3c4043] border-gray-200">
             
             <div class="flex justify-between items-center mb-3">
                 <div class="flex items-center gap-3">
