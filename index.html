@@ -1108,9 +1108,17 @@
             const setup = ref({ destination: '', startDate: new Date().toISOString().split('T')[0], days: 3 });
             
             const newExpense = ref({ 
-                item: '', amount: '', currency: 'JPY', rate: 0.03, date: new Date().toISOString().split('T')[0], paidBy: 'Me',
-                splitMethod: 'equal', involved: ['Me'], splitDetails: { 'Me': 1 },
-                isSettled: false, settlements: {}
+                item: '', 
+                amount: '', 
+                currency: 'JPY', 
+                rate: 0.03, 
+                date: new Date().toISOString().split('T')[0], 
+                paidBy: travelers.value[0], // Auto-select first traveler
+                splitMethod: 'equal', 
+                involved: [...travelers.value], // Auto-select all travelers
+                splitDetails: travelers.value.reduce((acc, p) => ({ ...acc, [p]: 1 }), {}), // Initialize ratios
+                isSettled: false, 
+                settlements: {}
             });
 
             // Computed
@@ -1759,12 +1767,26 @@
             const addExpense = () => {
                 if(!newExpense.value.item || !newExpense.value.amount) return;
                 if(newExpense.value.splitMethod === 'amount' && Math.abs(currentSplitSum.value - newExpense.value.amount) > 1) return;
-                if(!newExpense.value.date) newExpense.value.date = new Date().toISOString().split('T')[0];
-                if(!newExpense.value.paidBy) newExpense.value.paidBy = travelers.value[0];
-                const expenseToAdd = { ...newExpense.value, involved: [...newExpense.value.involved], splitDetails: { ...newExpense.value.splitDetails }, isSettled: false };
+                
+                const expenseToAdd = { 
+                    ...newExpense.value, 
+                    involved: [...newExpense.value.involved], 
+                    splitDetails: { ...newExpense.value.splitDetails }, 
+                    isSettled: false 
+                };
+                
                 expenses.value.unshift(expenseToAdd);
-                newExpense.value.item = ''; newExpense.value.amount = '';
-                if(newExpense.value.splitMethod === 'amount') Object.keys(newExpense.value.splitDetails).forEach(k => newExpense.value.splitDetails[k] = 0);
+                
+                // Reset form to defaults
+                newExpense.value.item = ''; 
+                newExpense.value.amount = '';
+                newExpense.value.paidBy = travelers.value[0]; // Reset to first member
+                newExpense.value.involved = [...travelers.value]; // Reset to all members
+                
+                if(newExpense.value.splitMethod === 'amount') {
+                    Object.keys(newExpense.value.splitDetails).forEach(k => newExpense.value.splitDetails[k] = 0);
+                }
+                
                 saveCurrentTripDebounced();
             };
 
@@ -1889,6 +1911,18 @@
                     }
                 });
             };
+
+            watch(travelers, (newList) => {
+                // If current "paidBy" no longer exists, reset to first available
+                if (!newList.includes(newExpense.value.paidBy)) {
+                    newExpense.value.paidBy = newList[0];
+                }
+                
+                // Keep "involved" synced if user hasn't manually changed it
+                if (newExpense.value.involved.length === 0 || newExpense.value.involved.length >= newList.length - 1) {
+                    newExpense.value.involved = [...newList];
+                }
+            }, { deep: true });
 
             watch([days, expenses, setup, travelers], () => { saveCurrentTripDebounced(); }, { deep: true });
             watch(viewMode, (v) => { if (v === 'map') initMap(); if (v === 'plan') { refreshCurrentDayWeather(); nextTick(initSortable); refreshAllNotesHeights();} });
