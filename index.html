@@ -1172,12 +1172,27 @@
 
                     if (remoteTrips.length > 0) {
                         tripList.value = remoteTrips;
-                        // Determine which trip to load (last accessed logic could go here)
-                        if (!currentTripId.value) {
-                             switchTrip(tripList.value[0].id);
+                        
+                        // --- ADD THIS LOGIC TO REFRESH CURRENT DATA ---
+                        if (currentTripId.value) {
+                            // Find the updated version of the current trip from the new list
+                            const updatedActiveTrip = remoteTrips.find(t => t.id === currentTripId.value);
+                            if (updatedActiveTrip) {
+                                // Manually update the reactive refs being used in the UI
+                                setup.value = JSON.parse(JSON.stringify(updatedActiveTrip.setup));
+                                days.value = JSON.parse(JSON.stringify(updatedActiveTrip.days));
+                                expenses.value = JSON.parse(JSON.stringify(updatedActiveTrip.expenses || []));
+                                travelers.value = updatedActiveTrip.travelers?.length 
+                                    ? JSON.parse(JSON.stringify(updatedActiveTrip.travelers)) 
+                                    : ['Me'];
+                            }
+                        } else {
+                            // If no trip is active, load the first one found
+                            switchTrip(tripList.value[0].id);
                         }
+                        // ----------------------------------------------
+                        
                     } else {
-                        // If DB empty, fallback to local or create new
                         const savedPlans = localStorage.getItem('travel_plans_v2');
                         if (savedPlans) {
                             tripList.value = JSON.parse(savedPlans);
@@ -1188,7 +1203,6 @@
                     }
                 } catch (e) {
                     console.error("Error loading from Firebase:", e);
-                    // Fallback
                     const savedPlans = localStorage.getItem('travel_plans_v2');
                     if (savedPlans) tripList.value = JSON.parse(savedPlans);
                 }
