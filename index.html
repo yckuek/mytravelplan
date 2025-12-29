@@ -1154,6 +1154,27 @@
             // interim solution
             const isDark = computed(() => false);
 
+            // data migration
+            const repairMissingIds = () => {
+                let modified = false;
+                tripList.value.forEach(trip => {
+                    trip.days.forEach(day => {
+                        day.items.forEach(item => {
+                            // If the item doesn't have an ID, generate one
+                            if (!item.id) {
+                                item.id = Date.now() + Math.random();
+                                modified = true;
+                            }
+                        });
+                    });
+                });
+                
+                if (modified) {
+                    console.log("Old items repaired with new IDs");
+                    saveToFirebase(); // Save the fixed data back to the cloud
+                }
+            };
+
             // --- Database Functions ---
 
             // Debounced Save to Firebase (prevents spamming writes)
@@ -1192,12 +1213,13 @@
                     if (remoteTrips.length > 0) {
                         tripList.value = remoteTrips;
                         
-                        // --- NEW REFRESH LOGIC ---
+                        // --- ADD THE REPAIR CALL HERE ---
+                        repairMissingIds();
+                        
                         if (currentTripId.value) {
-                            // Find the fresh version of the trip you are currently looking at
                             const updatedActiveTrip = remoteTrips.find(t => t.id === currentTripId.value);
                             if (updatedActiveTrip) {
-                                // Force overwrite the local reactive state with the new remote data
+                                // Re-sync active state
                                 setup.value = JSON.parse(JSON.stringify(updatedActiveTrip.setup));
                                 days.value = JSON.parse(JSON.stringify(updatedActiveTrip.days));
                                 expenses.value = JSON.parse(JSON.stringify(updatedActiveTrip.expenses || []));
@@ -1205,19 +1227,14 @@
                                     ? JSON.parse(JSON.stringify(updatedActiveTrip.travelers)) 
                                     : ['Me'];
                                 
-                                // Trigger height refresh for notes if you switched back to Plan view
                                 nextTick(() => refreshAllNotesHeights());
                             }
                         } else {
                             switchTrip(tripList.value[0].id);
                         }
-                        // -------------------------
-                        
-                    } else {
-                        // ... (rest of your existing localStorage fallback)
                     }
                 } catch (e) {
-                    console.error("Error loading from Firebase:", e);
+                    console.error("Error loading:", e);
                 }
             };
 
@@ -1922,19 +1939,30 @@
                     ghostClass: 'sortable-ghost',
                     dragClass: 'sortable-drag',
                     handle: '.cursor-move',
-                    
-                    // --- ADD THESE OPTIONS FOR "HOLD AND DRAG" ---
-                    delay: 400, // Time in milliseconds to hold before dragging starts
-                    delayOnTouchOnly: true, // Only apply the delay on mobile/touch devices
-                    touchStartThreshold: 5, // Pixels the finger can move before canceling the long-press
-                    // ---------------------------------------------
+                    delay: 400,
+                    delayOnTouchOnly: true,
+                    touchStartThreshold: 5,
 
                     onEnd: (evt) => {
-                        const { oldIndex, newIndex } = evt;
+                        // Get the indices from the event
+                        const oldIndex = evt.oldIndex;
+                        const newIndex = evt.newIndex;
+
                         if (oldIndex === newIndex) return;
-                        const movedItem = currentDay.value.items.splice(oldIndex, 1)[0];
-                        currentDay.value.items.splice(newIndex, 0, movedItem);
-                        saveCurrentTripDebounced();
+
+                        // 1. Manually move the item in the reactive array
+                        const items = [...currentDay.value.items];
+                        const movedItem = items.splice(oldIndex, 1)[0];
+                        items.splice(newIndex, 0, movedItem);
+
+                        // 2. Overwrite the array with the new version
+                        currentDay.value.items = items;
+
+                        // 3. Force Vue to re-render based on the new data order
+                        // This prevents the "jumping" behavior
+                        nextTick(() => {
+                            saveCurrentTripDebounced();
+                        });
                     }
                 });
             };
@@ -2041,7 +2069,8 @@
                 handleTouchMove,
                 handleTouchEnd,
                 isLoading,
-                isDark
+                isDark,
+                repairMissingIds
             }
         }
     }).mount('#app')
