@@ -151,23 +151,21 @@
             appearance: none;
         }
 
-        /* --- Aggressive iOS Select Centering --- */
+        /* --- Final Fix for iPhone Select Centering --- */
         select {
             text-align: center !important;
-            text-align-last: center !important; /* Forces centering on Safari */
-            -webkit-appearance: none;
-            appearance: none;
+            text-align-last: center !important; /* Critical for Safari centering */
+            -webkit-appearance: none !important; /* Removes native iOS arrow/styling */
+            appearance: none !important;
             padding-left: 0 !important;
             padding-right: 0 !important;
+            text-indent: 0.01px; /* Subtle nudge for older Safari versions */
+            background-image: none !important;
         }
 
-        /* Fix for the Spot/Activity column on mobile */
-        .mobile-col-center {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
+        /* Remove the default arrow in IE/Edge if needed */
+        select::-ms-expand {
+            display: none;
         }
     </style>
 </head>
@@ -331,11 +329,11 @@
                             <i class="ph-bold ph-clock absolute left-2 top-1/2 -translate-y-1/2 text-[10px] pointer-events-none z-10 text-gray-400"></i>
                         </div>
                         
-                        <select 
-                            :value="item.type" 
-                            @change="updateItemType(item, $event.target.value)"
-                            class="text-[10px] w-full border rounded py-1 transition-theme text-center appearance-none font-bold bg-white border-gray-200 text-gray-500 flex items-center justify-center"
-                            style="-webkit-appearance: none; text-align-last: center;">
+                       <select 
+                        :value="item.type" 
+                        @change="updateItemType(item, $event.target.value)"
+                        class="text-[10px] w-full border rounded py-1 transition-theme bg-white border-gray-200 text-gray-500 font-bold text-center block"
+                        style="-webkit-appearance: none; text-align-last: center; padding: 4px 0;">
                             <option value="spot">📍 {{ t.spot }}</option>
                             <option value="activity">☕ {{ t.activity }}</option>
                             <option value="food">🍴 {{ t.food }}</option>
